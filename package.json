@@ -1,0 +1,20 @@
+{
+  "name": "tijuanaclawfights",
+  "module": "server/index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun run --watch server/index.ts",
+    "build": "bun build client/renderer.ts client/spectator-client.ts --outdir=client/dist --target=browser",
+    "agent": "bun run test-agent/agent.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "pixi.js": "^8"
+  }
+}

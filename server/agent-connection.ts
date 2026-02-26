@@ -1,0 +1,77 @@
+import type { ServerWebSocket } from "bun";
+import type { AgentMessage } from "./protocol.ts";
+import type { GameEngine } from "./game-engine.ts";
+import type { Matchmaker } from "./matchmaker.ts";
+
+export interface AgentData {
+  agentId: string;
+  matchId?: string;
+  fighterIndex?: 0 | 1;
+}
+
+// Registered agents: id → name
+const agents = new Map<string, string>();
+
+export function handleAgentMessage(
+  ws: ServerWebSocket<AgentData>,
+  raw: string,
+  engine: GameEngine,
+  matchmaker: Matchmaker
+): void {
+  let msg: AgentMessage;
+  try {
+    msg = JSON.parse(raw);
+  } catch {
+    ws.send(JSON.stringify({ type: "error", message: "Invalid JSON" }));
+    return;
+  }
+
+  switch (msg.type) {
+    case "register": {
+      const id = crypto.randomUUID();
+      agents.set(id, msg.name);
+      ws.data.agentId = id;
+      engine.agentSockets.set(id, ws as any);
+      ws.send(JSON.stringify({ type: "registered", id }));
+      console.log(`[Agent] ${msg.name} registered (${id})`);
+      break;
+    }
+
+    case "join_queue": {
+      const name = agents.get(ws.data.agentId);
+      if (!name) {
+        ws.send(JSON.stringify({ type: "error", message: "Not registered" }));
+        return;
+      }
+      ws.send(JSON.stringify({ type: "queued" }));
+      matchmaker.enqueue(ws.data.agentId, name);
+      break;
+    }
+
+    case "action": {
+      if (!ws.data.matchId || ws.data.fighterIndex === undefined) {
+        ws.send(JSON.stringify({ type: "error", message: "Not in a match" }));
+        return;
+      }
+      const match = engine.matches.get(ws.data.matchId);
+      if (match) {
+        match.setAction(ws.data.fighterIndex, msg.action);
+      }
+      break;
+    }
+  }
+}
+
+export function handleAgentClose(
+  ws: ServerWebSocket<AgentData>,
+  engine: GameEngine,
+  matchmaker: Matchmaker
+): void {
+  const { agentId } = ws.data;
+  if (agentId) {
+    matchmaker.dequeue(agentId);
+    engine.agentSockets.delete(agentId);
+    agents.delete(agentId);
+    console.log(`[Agent] ${agentId} disconnected`);
+  }
+}

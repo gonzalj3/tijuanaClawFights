@@ -1,0 +1,38 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #0a0a0a;
+  color: #e0e0e0;
+  font-family: 'Courier New', monospace;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+}
+h1 {
+  font-size: 1.8rem;
+  margin: 1rem 0 0.5rem;
+  color: #ff4444;
+  text-transform: uppercase;
+  letter-spacing: 4px;
+}
+#status {
+  font-size: 0.9rem;
+  color: #888;
+  margin-bottom: 0.5rem;
+}
+#game-container {
+  border: 2px solid #333;
+  border-radius: 4px;
+  overflow: hidden;
+}
+#match-info {
+  display: flex;
+  justify-content: space-between;
+  width: 800px;
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+}
+.fighter-name { font-weight: bold; }
+.fighter-name.p1 { color: #4488ff; }
+.fighter-name.p2 { color: #ff4444; }
+.timer { color: #ffcc00; font-size: 1.2rem; }
