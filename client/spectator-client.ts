@@ -34,22 +34,49 @@ export type AnimationEvent = {
   text: string;
 };
 
-export type SpectatorMsg = MatchStateMsg | MatchStartMsg | MatchEndMsg | { type: "match_list"; matches: any[] };
+export type PausedMsg = {
+  type: "paused";
+  paused: boolean;
+};
+
+export type AgentRelayMsg = {
+  type: "agent_msg";
+  fighter: 0 | 1;
+  name: string;
+  direction: "in" | "out";
+  msg: any;
+};
+
+export type SpectatorMsg = MatchStateMsg | MatchStartMsg | MatchEndMsg | PausedMsg | AgentRelayMsg | { type: "match_list"; matches: any[] };
 
 export type SpectatorCallbacks = {
   onMatchState: (msg: MatchStateMsg) => void;
   onMatchStart: (msg: MatchStartMsg) => void;
   onMatchEnd: (msg: MatchEndMsg) => void;
+  onPaused: (msg: PausedMsg) => void;
+  onAgentMsg: (msg: AgentRelayMsg) => void;
   onConnect: () => void;
   onDisconnect: () => void;
 };
 
-export function connectSpectator(callbacks: SpectatorCallbacks): void {
+export interface SpectatorConnection {
+  send: (msg: any) => void;
+}
+
+export function connectSpectator(callbacks: SpectatorCallbacks): SpectatorConnection {
   const proto = location.protocol === "https:" ? "wss:" : "ws:";
   const url = `${proto}//${location.host}/spectate`;
 
   let ws: WebSocket;
   let reconnectTimer: number;
+
+  const connection: SpectatorConnection = {
+    send(msg: any) {
+      if (ws?.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(msg));
+      }
+    },
+  };
 
   function connect() {
     ws = new WebSocket(url);
@@ -71,6 +98,12 @@ export function connectSpectator(callbacks: SpectatorCallbacks): void {
         case "match_end":
           callbacks.onMatchEnd(msg);
           break;
+        case "paused":
+          callbacks.onPaused(msg);
+          break;
+        case "agent_msg":
+          callbacks.onAgentMsg(msg);
+          break;
       }
     };
 
@@ -82,4 +115,5 @@ export function connectSpectator(callbacks: SpectatorCallbacks): void {
   }
 
   connect();
+  return connection;
 }

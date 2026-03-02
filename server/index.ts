@@ -1,6 +1,7 @@
 import { GameEngine } from "./game-engine.ts";
 import { Matchmaker } from "./matchmaker.ts";
 import { handleAgentMessage, handleAgentClose, type AgentData } from "./agent-connection.ts";
+import type { SpectatorControlMessage } from "./protocol.ts";
 import { readFileSync } from "fs";
 import { join } from "path";
 
@@ -22,6 +23,10 @@ function serveStatic(path: string): Response {
       css: "text/css",
       js: "application/javascript",
       ts: "application/javascript",
+      png: "image/png",
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      webp: "image/webp",
     };
     return new Response(file, {
       headers: { "Content-Type": contentType[ext] ?? "application/octet-stream" },
@@ -61,6 +66,9 @@ const server = Bun.serve({
     if (url.pathname.endsWith(".css")) {
       return serveStatic(url.pathname.slice(1));
     }
+    if (url.pathname.startsWith("/assets/")) {
+      return serveStatic(url.pathname.slice(1));
+    }
 
     return new Response("Not found", { status: 404 });
   },
@@ -81,8 +89,19 @@ const server = Bun.serve({
 
       if (data.type === "agent") {
         handleAgentMessage(ws as any, raw, engine, matchmaker);
+      } else if (data.type === "spectator") {
+        // Handle spectator control messages
+        try {
+          const msg: SpectatorControlMessage = JSON.parse(raw);
+          if (msg.type === "pause") {
+            matchmaker.pause();
+            engine.broadcastToSpectators({ type: "paused", paused: true });
+          } else if (msg.type === "resume") {
+            matchmaker.resume();
+            engine.broadcastToSpectators({ type: "paused", paused: false });
+          }
+        } catch {}
       }
-      // Spectators don't send messages
     },
 
     close(ws) {

@@ -81,7 +81,23 @@ export type SpectatorMessage =
       matchId: string;
       winner: string | null;
       reason: "ko" | "timeout";
+    }
+  | {
+      type: "paused";
+      paused: boolean;
+    }
+  | {
+      type: "agent_msg";
+      fighter: 0 | 1;
+      name: string;
+      direction: "in" | "out";
+      msg: any;
     };
+
+// ─── Spectator → Server Messages ───────────────────────────────
+export type SpectatorControlMessage =
+  | { type: "pause" }
+  | { type: "resume" };
 
 // ─── Combat Constants ──────────────────────────────────────────
 export const ARENA_WIDTH = 10;

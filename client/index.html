@@ -9,7 +9,20 @@
 <body>
   <h1>Tijuana Claw Fights</h1>
   <p id="status">Connecting...</p>
+  <div id="controls">
+    <button id="pause-btn">Pause</button>
+  </div>
   <div id="game-container"></div>
+  <div id="agent-panels">
+    <div class="agent-panel" id="agent-panel-0">
+      <h3 class="p1">Fighter 1</h3>
+      <div class="agent-log" id="agent-log-0"></div>
+    </div>
+    <div class="agent-panel" id="agent-panel-1">
+      <h3 class="p2">Fighter 2</h3>
+      <div class="agent-log" id="agent-log-1"></div>
+    </div>
+  </div>
   <script type="module" src="/dist/renderer.js"></script>
 </body>
 </html>

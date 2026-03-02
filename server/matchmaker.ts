@@ -8,6 +8,7 @@ interface QueuedAgent {
 export class Matchmaker {
   private queue: QueuedAgent[] = [];
   private matchCounter = 0;
+  paused = false;
 
   constructor(private engine: GameEngine) {}
 
@@ -16,11 +17,29 @@ export class Matchmaker {
     if (this.queue.some((a) => a.id === agentId)) return;
     this.queue.push({ id: agentId, name: agentName });
     console.log(`[Matchmaker] ${agentName} joined queue (${this.queue.length} waiting)`);
-    this.tryMatch();
+    if (!this.paused) {
+      this.tryMatch();
+    } else {
+      console.log(`[Matchmaker] Paused — holding queue`);
+      // Notify queued agents they're paused
+      const sock = this.engine.agentSockets.get(agentId);
+      sock?.send(JSON.stringify({ type: "paused", message: "Arena is paused. Waiting for resume." }));
+    }
   }
 
   dequeue(agentId: string): void {
     this.queue = this.queue.filter((a) => a.id !== agentId);
+  }
+
+  pause(): void {
+    this.paused = true;
+    console.log(`[Matchmaker] Paused — no new matches will start`);
+  }
+
+  resume(): void {
+    this.paused = false;
+    console.log(`[Matchmaker] Resumed`);
+    this.tryMatch();
   }
 
   private tryMatch(): void {

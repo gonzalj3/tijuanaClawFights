@@ -36,3 +36,73 @@ h1 {
 .fighter-name.p1 { color: #4488ff; }
 .fighter-name.p2 { color: #ff4444; }
 .timer { color: #ffcc00; font-size: 1.2rem; }
+
+/* Controls */
+#controls {
+  margin: 0.5rem 0;
+}
+#pause-btn {
+  background: #333;
+  color: #e0e0e0;
+  border: 2px solid #555;
+  border-radius: 4px;
+  padding: 0.4rem 1.5rem;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  transition: background 0.15s, border-color 0.15s;
+}
+#pause-btn:hover {
+  background: #444;
+  border-color: #777;
+}
+#pause-btn.paused {
+  background: #442222;
+  border-color: #ff4444;
+  color: #ff4444;
+}
+
+/* Agent message panels */
+#agent-panels {
+  display: flex;
+  gap: 1rem;
+  width: 800px;
+  margin-top: 0.5rem;
+}
+.agent-panel {
+  flex: 1;
+  border: 1px solid #333;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.agent-panel h3 {
+  font-size: 0.8rem;
+  padding: 0.3rem 0.5rem;
+  background: #1a1a1a;
+  border-bottom: 1px solid #333;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+.agent-log {
+  height: 200px;
+  overflow-y: auto;
+  padding: 0.3rem;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  background: #0d0d0d;
+}
+.agent-log .msg {
+  padding: 1px 4px;
+  border-bottom: 1px solid #1a1a1a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.agent-log .msg.msg-in {
+  color: #6a6;
+}
+.agent-log .msg.msg-out {
+  color: #888;
+}

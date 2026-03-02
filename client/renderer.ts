@@ -1,15 +1,18 @@
-import { Application, Graphics, Text, TextStyle } from "pixi.js";
+import { Application, Graphics, Text, TextStyle, Sprite, Container } from "pixi.js";
 import { connectSpectator } from "./spectator-client.ts";
-import type { MatchStateMsg, MatchStartMsg, MatchEndMsg, FighterState } from "./spectator-client.ts";
+import type { MatchStateMsg, MatchStartMsg, MatchEndMsg, PausedMsg, AgentRelayMsg, FighterState } from "./spectator-client.ts";
+import { FighterSprite, ScreenShake, loadAllAssets, actionToAnim } from "./sprites.ts";
+import type { LoadedAssets } from "./sprites.ts";
 
 const CANVAS_W = 800;
 const CANVAS_H = 400;
 const ARENA_UNITS = 10;
 const UNIT_PX = CANVAS_W / (ARENA_UNITS + 2); // padding on sides
-const FIGHTER_W = 40;
-const FIGHTER_H = 70;
+const FIGHTER_W = 160;
+const FIGHTER_H = 280;
 const HP_BAR_W = 60;
 const HP_BAR_H = 8;
+const GROUND_Y = CANVAS_H - 50;
 
 const COLORS = {
   p1: 0x4488ff,
@@ -24,8 +27,9 @@ const COLORS = {
 // State
 let currentFighters: [FighterState, FighterState] | null = null;
 let targetFighters: [FighterState, FighterState] | null = null;
+let prevFighters: [FighterState, FighterState] | null = null;
 let interpProgress = 0;
-let activeEvents: Array<{ text: string; x: number; y: number; age: number }> = [];
+let activeEvents: Array<{ text: string; x: number; y: number; age: number; type: string }> = [];
 let matchActive = false;
 let statusEl: HTMLElement;
 let timerText: Text;
@@ -35,6 +39,15 @@ let announcementTimer = 0;
 
 async function main() {
   statusEl = document.getElementById("status")!;
+
+  // Load sprite assets (gracefully handles missing files)
+  const assets = await loadAllAssets();
+  const hasSprites = !!(assets.fighter1 && assets.fighter2);
+  if (hasSprites) {
+    console.log("[renderer] Sprite sheets loaded!");
+  } else {
+    console.log("[renderer] No sprite sheets found, using fallback rectangles");
+  }
 
   const app = new Application();
   await app.init({
@@ -46,36 +59,54 @@ async function main() {
 
   document.getElementById("game-container")!.appendChild(app.canvas);
 
-  // Floor
-  const floor = new Graphics();
-  floor.rect(0, CANVAS_H - 50, CANVAS_W, 50);
-  floor.fill(COLORS.floor);
-  app.stage.addChild(floor);
+  // Game layer (gets shaken)
+  const gameLayer = new Container();
+  app.stage.addChild(gameLayer);
 
-  // Fighter graphics
-  const fighter1Gfx = new Graphics();
-  const fighter2Gfx = new Graphics();
-  app.stage.addChild(fighter1Gfx);
-  app.stage.addChild(fighter2Gfx);
+  // Background
+  if (assets.background) {
+    const bg = new Sprite(assets.background);
+    bg.width = CANVAS_W;
+    bg.height = CANVAS_H;
+    gameLayer.addChild(bg);
+  } else {
+    // Fallback floor
+    const floor = new Graphics();
+    floor.rect(0, GROUND_Y, CANVAS_W, 50);
+    floor.fill(COLORS.floor);
+    gameLayer.addChild(floor);
+  }
+
+  // Fighter sprites
+  const fighter1 = new FighterSprite(COLORS.p1, FIGHTER_W, FIGHTER_H);
+  const fighter2 = new FighterSprite(COLORS.p2, FIGHTER_W, FIGHTER_H);
+  if (assets.fighter1) fighter1.loadFromTexture(assets.fighter1);
+  if (assets.fighter2) fighter2.loadFromTexture(assets.fighter2);
+  gameLayer.addChild(fighter1.container);
+  gameLayer.addChild(fighter2.container);
+  const fighters = [fighter1, fighter2];
+
+  // Screen shake
+  const shake = new ScreenShake();
 
   // HP bars
   const hp1Bg = new Graphics();
   const hp1Fill = new Graphics();
   const hp2Bg = new Graphics();
   const hp2Fill = new Graphics();
-  app.stage.addChild(hp1Bg, hp1Fill, hp2Bg, hp2Fill);
+  gameLayer.addChild(hp1Bg, hp1Fill, hp2Bg, hp2Fill);
 
   // Name labels
   const nameStyle = new TextStyle({ fontSize: 14, fill: 0xffffff, fontFamily: "Courier New" });
   const name1 = new Text({ text: "", style: nameStyle });
   const name2 = new Text({ text: "", style: nameStyle });
-  app.stage.addChild(name1, name2);
+  gameLayer.addChild(name1, name2);
 
   // Action labels
   const actionStyle = new TextStyle({ fontSize: 12, fill: 0xaaaaaa, fontFamily: "Courier New" });
   const action1 = new Text({ text: "", style: actionStyle });
   const action2 = new Text({ text: "", style: actionStyle });
-  app.stage.addChild(action1, action2);
+  gameLayer.addChild(action1, action2);
 
   // Timer
   const timerStyle = new TextStyle({ fontSize: 20, fill: 0xffcc00, fontFamily: "Courier New", fontWeight: "bold" });
@@ -83,7 +114,7 @@ async function main() {
   timerText.anchor.set(0.5, 0);
   timerText.x = CANVAS_W / 2;
   timerText.y = 10;
-  app.stage.addChild(timerText);
+  gameLayer.addChild(timerText);
 
   // Match info (center)
   const infoStyle = new TextStyle({ fontSize: 16, fill: 0x888888, fontFamily: "Courier New" });
@@ -91,7 +122,11 @@ async function main() {
   matchInfoText.anchor.set(0.5);
   matchInfoText.x = CANVAS_W / 2;
   matchInfoText.y = CANVAS_H / 2;
-  app.stage.addChild(matchInfoText);
+  gameLayer.addChild(matchInfoText);
+
+  // UI layer (not shaken)
+  const uiLayer = new Container();
+  app.stage.addChild(uiLayer);
 
   // Announcement text (KO, etc.)
   const announceStyle = new TextStyle({
@@ -105,7 +140,7 @@ async function main() {
   announcementText.anchor.set(0.5);
   announcementText.x = CANVAS_W / 2;
   announcementText.y = CANVAS_H / 2 - 30;
-  app.stage.addChild(announcementText);
+  uiLayer.addChild(announcementText);
 
   // Event text container
   const eventTexts: Text[] = [];
@@ -117,28 +152,16 @@ async function main() {
     stroke: { color: 0x000000, width: 3 },
   });
 
+  // Effects layer (between fighters and UI)
+  const fxLayer = new Container();
+  gameLayer.addChild(fxLayer);
+
   function unitToX(unit: number): number {
     return (unit + 1) * UNIT_PX;
   }
 
-  function drawFighter(gfx: Graphics, x: number, color: number, flash: boolean) {
-    gfx.clear();
-    const drawColor = flash ? 0xffffff : color;
-    gfx.rect(x - FIGHTER_W / 2, CANVAS_H - 50 - FIGHTER_H, FIGHTER_W, FIGHTER_H);
-    gfx.fill(drawColor);
-    // "Claws" - small triangles at the sides
-    gfx.moveTo(x - FIGHTER_W / 2 - 10, CANVAS_H - 50 - FIGHTER_H + 20);
-    gfx.lineTo(x - FIGHTER_W / 2, CANVAS_H - 50 - FIGHTER_H + 10);
-    gfx.lineTo(x - FIGHTER_W / 2, CANVAS_H - 50 - FIGHTER_H + 30);
-    gfx.fill(drawColor);
-    gfx.moveTo(x + FIGHTER_W / 2 + 10, CANVAS_H - 50 - FIGHTER_H + 20);
-    gfx.lineTo(x + FIGHTER_W / 2, CANVAS_H - 50 - FIGHTER_H + 10);
-    gfx.lineTo(x + FIGHTER_W / 2, CANVAS_H - 50 - FIGHTER_H + 30);
-    gfx.fill(drawColor);
-  }
-
   function drawHpBar(bg: Graphics, fill: Graphics, x: number, hp: number) {
-    const y = CANVAS_H - 50 - FIGHTER_H - 20;
+    const y = GROUND_Y - FIGHTER_H - 20;
     bg.clear();
     bg.rect(x - HP_BAR_W / 2, y, HP_BAR_W, HP_BAR_H);
     bg.fill(COLORS.hpBg);
@@ -149,8 +172,44 @@ async function main() {
     fill.fill(color);
   }
 
+  // Agent message panels
+  const agentLogs = [
+    document.getElementById("agent-log-0")!,
+    document.getElementById("agent-log-1")!,
+  ];
+  const agentHeaders = [
+    document.querySelector("#agent-panel-0 h3")!,
+    document.querySelector("#agent-panel-1 h3")!,
+  ];
+  const MAX_LOG_ENTRIES = 100;
+
+  function appendAgentMsg(fighter: 0 | 1, direction: "in" | "out", msg: any) {
+    const log = agentLogs[fighter]!;
+    const el = document.createElement("div");
+    el.className = `msg msg-${direction}`;
+    const arrow = direction === "in" ? "\u2192" : "\u2190";
+    let text: string;
+    if (msg.type === "action") {
+      text = `${arrow} action: ${msg.action} (t${msg.tick})`;
+    } else if (msg.type === "game_state") {
+      text = `${arrow} state: hp=${msg.you?.hp}/${msg.opponent?.hp} d=${Math.abs((msg.you?.x ?? 0) - (msg.opponent?.x ?? 0))} t${msg.tick}`;
+    } else {
+      text = `${arrow} ${msg.type}: ${JSON.stringify(msg).slice(0, 80)}`;
+    }
+    el.textContent = text;
+    log.appendChild(el);
+    while (log.children.length > MAX_LOG_ENTRIES) {
+      log.removeChild(log.firstChild!);
+    }
+    log.scrollTop = log.scrollHeight;
+  }
+
+  // Pause button
+  const pauseBtn = document.getElementById("pause-btn")! as HTMLButtonElement;
+  let isPaused = false;
+
   // Connect to server
-  connectSpectator({
+  const conn = connectSpectator({
     onConnect() {
       statusEl.textContent = "Connected - waiting for match...";
     },
@@ -161,6 +220,13 @@ async function main() {
       matchActive = true;
       matchInfoText.text = "";
       showAnnouncement("FIGHT!", 0xffcc00);
+      agentHeaders[0]!.textContent = msg.fighters[0];
+      agentHeaders[1]!.textContent = msg.fighters[1];
+      agentLogs[0]!.innerHTML = "";
+      agentLogs[1]!.innerHTML = "";
+      // Reset fighter sprites to idle
+      fighter1.setState("idle");
+      fighter2.setState("idle");
       console.log(`Match started: ${msg.fighters[0]} vs ${msg.fighters[1]}`);
     },
     onMatchState(msg: MatchStateMsg) {
@@ -168,6 +234,8 @@ async function main() {
         matchActive = true;
         matchInfoText.text = "";
       }
+
+      prevFighters = currentFighters;
 
       // Interpolation: store target, lerp from current
       if (!currentFighters) {
@@ -182,7 +250,44 @@ async function main() {
       // Process events
       for (const ev of msg.events) {
         const fx = unitToX(msg.fighters[ev.fighter].x);
-        activeEvents.push({ text: ev.text, x: fx, y: CANVAS_H - 50 - FIGHTER_H - 40, age: 0 });
+        activeEvents.push({
+          text: ev.text,
+          x: fx,
+          y: GROUND_Y - FIGHTER_H - 40,
+          age: 0,
+          type: ev.type,
+        });
+
+        // Spawn effect sprites
+        if (assets.effects.isLoaded) {
+          const effectY = GROUND_Y - FIGHTER_H / 2;
+          if (ev.type === "hit") {
+            assets.effects.spawn("hit", fx, effectY, fxLayer);
+          } else if (ev.type === "block") {
+            assets.effects.spawn("block", fx, effectY, fxLayer);
+          } else if (ev.type === "ko") {
+            assets.effects.spawn("hit", fx, effectY, fxLayer);
+            shake.trigger(6, 20); // big shake on KO
+          }
+        }
+
+        // Screen shake on hits (even without effect sprites)
+        if (ev.type === "hit") {
+          shake.trigger(3, 8);
+        } else if (ev.type === "ko") {
+          shake.trigger(6, 20);
+        }
+      }
+
+      // Update fighter animation states
+      for (let i = 0; i < 2; i++) {
+        const tgt = msg.fighters[i as 0 | 1];
+        const wasHit = msg.events.some(
+          (e) => e.type === "hit" && e.fighter !== i
+        );
+        const isKo = tgt.hp <= 0;
+        const anim = actionToAnim(tgt.lastAction, wasHit, isKo);
+        fighters[i]!.setState(anim);
       }
 
       timerText.text = `${Math.ceil(msg.timeRemaining / 5)}s`;
@@ -194,13 +299,33 @@ async function main() {
         : "DRAW!";
       showAnnouncement(resultText, msg.winner ? 0xff4444 : 0xffcc00);
       setTimeout(() => {
-        matchInfoText.text = "Waiting for next match...";
+        matchInfoText.text = isPaused ? "PAUSED - waiting for resume..." : "Waiting for next match...";
         currentFighters = null;
         targetFighters = null;
+        prevFighters = null;
         announcementText.text = "";
         timerText.text = "";
       }, 4000);
     },
+    onPaused(msg: PausedMsg) {
+      isPaused = msg.paused;
+      pauseBtn.textContent = isPaused ? "Resume" : "Pause";
+      pauseBtn.classList.toggle("paused", isPaused);
+      if (isPaused && !matchActive) {
+        matchInfoText.text = "PAUSED - waiting for resume...";
+      }
+    },
+    onAgentMsg(msg: AgentRelayMsg) {
+      appendAgentMsg(msg.fighter, msg.direction, msg.msg);
+    },
+  });
+
+  pauseBtn.addEventListener("click", () => {
+    if (isPaused) {
+      conn.send({ type: "resume" });
+    } else {
+      conn.send({ type: "pause" });
+    }
   });
 
   function showAnnouncement(text: string, color: number) {
@@ -211,6 +336,9 @@ async function main() {
 
   // Render loop
   app.ticker.add((ticker) => {
+    // Screen shake
+    shake.update(gameLayer);
+
     if (!currentFighters || !targetFighters) return;
 
     // Interpolate (5 ticks/sec = 200ms, at 60fps ~ 12 frames per tick)
@@ -219,18 +347,25 @@ async function main() {
     for (let i = 0; i < 2; i++) {
       const curr = currentFighters[i as 0 | 1];
       const tgt = targetFighters[i as 0 | 1];
+      const other = targetFighters[(1 - i) as 0 | 1];
       const lerpX = curr.x + (tgt.x - curr.x) * interpProgress;
       const x = unitToX(lerpX);
 
-      const gfx = i === 0 ? fighter1Gfx : fighter2Gfx;
-      const color = i === 0 ? COLORS.p1 : COLORS.p2;
+      const fSprite = fighters[i]!;
 
       // Check if fighter was just hit
       const justHit = activeEvents.some(
-        (e) => e.age < 3 && e.text.includes("!") && Math.abs(e.x - x) < UNIT_PX
+        (e) => e.age < 3 && e.type === "hit" && Math.abs(e.x - x) < UNIT_PX
       );
 
-      drawFighter(gfx, x, color, justHit);
+      if (fSprite.isFallback) {
+        // Fallback rectangle rendering
+        fSprite.drawFallback(x, GROUND_Y, justHit);
+      } else {
+        // Sprite rendering
+        fSprite.setPosition(x, GROUND_Y);
+        fSprite.setFacing(tgt.x < other.x); // face toward opponent
+      }
 
       // HP bars
       const bg = i === 0 ? hp1Bg : hp2Bg;
@@ -241,20 +376,19 @@ async function main() {
       const nameLabel = i === 0 ? name1 : name2;
       nameLabel.text = tgt.name;
       nameLabel.x = x - nameLabel.width / 2;
-      nameLabel.y = CANVAS_H - 50 - FIGHTER_H - 38;
+      nameLabel.y = GROUND_Y - FIGHTER_H - 38;
 
       // Action labels
       const actionLabel = i === 0 ? action1 : action2;
       actionLabel.text = tgt.lastAction ?? "";
       actionLabel.x = x - actionLabel.width / 2;
-      actionLabel.y = CANVAS_H - 40;
+      actionLabel.y = GROUND_Y + 10;
     }
 
     // Update event texts
-    // Clean up old event text sprites
     while (eventTexts.length > 0) {
       const t = eventTexts.pop()!;
-      app.stage.removeChild(t);
+      gameLayer.removeChild(t);
       t.destroy();
     }
 
@@ -268,7 +402,7 @@ async function main() {
       t.x = e.x;
       t.y = e.y;
       t.alpha = Math.max(0, 1 - e.age / 40);
-      app.stage.addChild(t);
+      gameLayer.addChild(t);
       eventTexts.push(t);
       return true;
     });

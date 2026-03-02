@@ -26,6 +26,18 @@ export function handleAgentMessage(
     return;
   }
 
+  // Relay incoming agent message to spectators for debug panel
+  const agentName = agents.get(ws.data.agentId);
+  if (ws.data.fighterIndex !== undefined && agentName) {
+    engine.broadcastToSpectators({
+      type: "agent_msg",
+      fighter: ws.data.fighterIndex,
+      name: agentName,
+      direction: "in",
+      msg,
+    });
+  }
+
   switch (msg.type) {
     case "register": {
       const id = crypto.randomUUID();

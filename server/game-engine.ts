@@ -87,7 +87,16 @@ export class GameEngine {
       for (const [agentId, sock] of this.agentSockets) {
         if (sock.data.matchId === matchId && sock.data.fighterIndex !== undefined) {
           try {
-            sock.send(JSON.stringify(match.getAgentState(sock.data.fighterIndex)));
+            const agentState = match.getAgentState(sock.data.fighterIndex);
+            sock.send(JSON.stringify(agentState));
+            // Relay outgoing message to spectators
+            this.broadcastToSpectators({
+              type: "agent_msg",
+              fighter: sock.data.fighterIndex,
+              name: match.fighters[sock.data.fighterIndex].name,
+              direction: "out",
+              msg: agentState,
+            });
           } catch {
             // Agent disconnected
           }
