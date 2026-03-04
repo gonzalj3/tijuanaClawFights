@@ -109,3 +109,30 @@ bun --hot ./index.ts
 ```
 
 For more information, read the Bun API docs in `node_modules/bun-types/docs/**.mdx`.
+
+## Project-Specific
+
+### Build & Run
+- `bun run dev` — start the game server (watches for changes)
+- `bun run build` — rebuild client bundle to `client/dist/` (**required** after editing client .ts files)
+- `bun run agent` — run a test bot agent
+- The browser loads pre-built JS from `client/dist/renderer.js`, NOT the .ts source directly
+
+### Architecture
+- WebSocket fighting game: 200ms ticks, 10-unit arena, 100 HP per fighter
+- Server: `server/index.ts` (Bun.serve with WebSocket), `server/game-engine.ts`, `server/match.ts`, `server/matchmaker.ts`
+- Client: Pixi.js v8 renderer (`client/renderer.ts`), sprite engine (`client/sprites.ts`), spectator WS client (`client/spectator-client.ts`)
+- Agents connect via WebSocket to `/agent`, spectators to `/spectate`
+- Protocol types in `server/protocol.ts` — actions: punch, kick, special, block, jump, move_left, move_right
+
+### Sprite Engine (`client/sprites.ts`)
+- Frame size: 128x128 pixels (from PixelLab.ai generation)
+- Spritesheet layout: 5 rows x 4 cols (512x640 PNG per fighter)
+  - Row 0: idle, Row 1: hit/stagger, Row 2: walk, Row 3: jump, Row 4: punch
+- `FighterSprite` takes `nativeFacingRight` param — P1 (fighter-blue) natively faces left (`false`), P2 (fighter-red) natively faces right (`true`)
+- Fighter display size controlled by `FIGHTER_W`/`FIGHTER_H` in `renderer.ts` (currently 100x150)
+- Assets in `client/assets/`: fighter-blue.png, fighter-red.png, arena-bg.png, fx-*.png
+
+### Companion Repo
+- OpenClaw fighter agent lives at `/Users/jmg/GitHub/openClawFighter` (separate repo)
+- Uses Claude Haiku with 140ms timeout + heuristic fallback for 200ms game ticks

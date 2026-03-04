@@ -8,8 +8,8 @@ const CANVAS_W = 800;
 const CANVAS_H = 400;
 const ARENA_UNITS = 10;
 const UNIT_PX = CANVAS_W / (ARENA_UNITS + 2); // padding on sides
-const FIGHTER_W = 160;
-const FIGHTER_H = 280;
+const FIGHTER_W = 100;
+const FIGHTER_H = 150;
 const HP_BAR_W = 60;
 const HP_BAR_H = 8;
 const GROUND_Y = CANVAS_H - 50;
@@ -78,8 +78,8 @@ async function main() {
   }
 
   // Fighter sprites
-  const fighter1 = new FighterSprite(COLORS.p1, FIGHTER_W, FIGHTER_H);
-  const fighter2 = new FighterSprite(COLORS.p2, FIGHTER_W, FIGHTER_H);
+  const fighter1 = new FighterSprite(COLORS.p1, FIGHTER_W, FIGHTER_H, false);  // natively faces left
+  const fighter2 = new FighterSprite(COLORS.p2, FIGHTER_W, FIGHTER_H, true);   // natively faces right
   if (assets.fighter1) fighter1.loadFromTexture(assets.fighter1);
   if (assets.fighter2) fighter2.loadFromTexture(assets.fighter2);
   gameLayer.addChild(fighter1.container);

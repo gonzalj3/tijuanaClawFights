@@ -48,8 +48,8 @@ export function actionToAnim(action: string | null, wasHit: boolean, isKo: boole
 //   hit     → Row 1 frame 0,2 (stagger)
 //   ko      → Row 1 frames reversed (falling)
 
-const FRAME_W = 64;
-const FRAME_H = 64;
+const FRAME_W = 128;
+const FRAME_H = 128;
 const SHEET_COLS = 4;
 
 /** Extract frames from a 4x4 grid */
@@ -85,38 +85,43 @@ export class FighterSprite {
   private useFallback: boolean;
   private fighterColor: number;
   private spriteScale: number;
+  private nativeFacingRight: boolean;
 
   readonly displayW: number;
   readonly displayH: number;
 
-  constructor(color: number, displayW: number, displayH: number) {
+  constructor(color: number, displayW: number, displayH: number, nativeFacingRight = false) {
     this.container = new Container();
     this.useFallback = true;
     this.fighterColor = color;
     this.displayW = displayW;
     this.displayH = displayH;
     this.spriteScale = displayH / FRAME_H;
+    this.nativeFacingRight = nativeFacingRight;
 
     this.fallbackGfx = new Graphics();
     this.container.addChild(this.fallbackGfx);
   }
 
   loadFromTexture(base: Texture): void {
-    const row0 = extractGrid(base, 0, 4); // idle / front-facing
-    const row1 = extractGrid(base, 1, 4); // walk down
-    const row2 = extractGrid(base, 2, 4); // walk right (side view)
-    const row3 = extractGrid(base, 3, 4); // walk up
+    const row0 = extractGrid(base, 0, 4); // idle
+    const row1 = extractGrid(base, 1, 4); // hit/stagger
+    const row2 = extractGrid(base, 2, 4); // walk
+    const row3 = extractGrid(base, 3, 4); // jump
+    const row4 = extractGrid(base, 4, 4); // punch (may be empty if sheet is 4 rows)
+
+    const punchFrames = row4[0] ? row4 : [row2[1]!, row2[2]!, row2[1]!];
 
     // Map game states to available frames
     this.setAnim("idle",    row0,                          0.08, true);
     this.setAnim("walk",    row2,                          0.15, true);
-    this.setAnim("punch",   [row2[1]!, row2[2]!, row2[1]!], 0.25, false);
-    this.setAnim("kick",    [row2[2]!, row2[3]!, row2[2]!], 0.25, false);
-    this.setAnim("special", [...row2, row2[3]!],           0.2,  false);
+    this.setAnim("punch",   punchFrames,                   0.25, false);
+    this.setAnim("kick",    [punchFrames[2]!, punchFrames[3]!, punchFrames[2]!], 0.25, false);
+    this.setAnim("special", [...punchFrames],              0.3,  false);
     this.setAnim("block",   [row0[0]!],                    0.1,  false);
-    this.setAnim("jump",    [row3[0]!, row3[1]!, row3[2]!], 0.15, false);
-    this.setAnim("hit",     [row1[0]!, row1[2]!],          0.2,  false);
-    this.setAnim("ko",      [row1[2]!, row1[1]!, row1[0]!], 0.1,  false);
+    this.setAnim("jump",    row3,                          0.15, false);
+    this.setAnim("hit",     row1,                          0.2,  false);
+    this.setAnim("ko",      [row1[3]!, row1[2]!, row1[1]!, row1[0]!], 0.1, false);
 
     this.useFallback = false;
 
@@ -189,7 +194,8 @@ export class FighterSprite {
   setFacing(facingRight: boolean): void {
     if (this.useFallback) return;
     if (this.current) {
-      this.current.scale.x = facingRight ? this.spriteScale : -this.spriteScale;
+      const needsFlip = facingRight !== this.nativeFacingRight;
+      this.current.scale.x = needsFlip ? -this.spriteScale : this.spriteScale;
     }
   }
 
