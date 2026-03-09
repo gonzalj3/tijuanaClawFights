@@ -92,7 +92,20 @@ export type SpectatorMessage =
       name: string;
       direction: "in" | "out";
       msg: any;
+    }
+  | {
+      type: "leaderboard";
+      entries: LeaderboardEntry[];
     };
+
+// ─── Leaderboard ──────────────────────────────────────────────
+export interface LeaderboardEntry {
+  rank: number;
+  name: string;
+  winStreak: number;
+  totalWins: number;
+  totalLosses: number;
+}
 
 // ─── Spectator → Server Messages ───────────────────────────────
 export type SpectatorControlMessage =

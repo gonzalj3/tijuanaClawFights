@@ -79,6 +79,7 @@ const server = Bun.serve({
       if (data.type === "spectator") {
         engine.spectators.add(ws as any);
         ws.send(JSON.stringify(engine.getMatchList()));
+        ws.send(JSON.stringify(engine.getLeaderboardMessage()));
         console.log("[Spectator] connected");
       }
     },

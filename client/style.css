@@ -64,6 +64,69 @@ h1 {
   color: #ff4444;
 }
 
+/* Leaderboard */
+#leaderboard {
+  width: 800px;
+  margin-top: 0.5rem;
+  border: 1px solid #333;
+  border-radius: 4px;
+  overflow: hidden;
+}
+#leaderboard h2 {
+  font-size: 0.9rem;
+  padding: 0.4rem 0.8rem;
+  background: #1a1a1a;
+  border-bottom: 1px solid #333;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  color: #ffcc00;
+}
+#leaderboard-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+#leaderboard-table thead th {
+  padding: 0.3rem 0.5rem;
+  text-align: left;
+  color: #888;
+  border-bottom: 1px solid #333;
+  font-weight: normal;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 1px;
+}
+#leaderboard-table tbody td {
+  padding: 0.3rem 0.5rem;
+  border-bottom: 1px solid #1a1a1a;
+}
+#leaderboard-table tbody tr:hover {
+  background: #1a1a2e;
+}
+#leaderboard-table .rank {
+  color: #ffcc00;
+  font-weight: bold;
+  width: 3rem;
+}
+#leaderboard-table .rank-1 .rank { color: #ffd700; }
+#leaderboard-table .rank-2 .rank { color: #c0c0c0; }
+#leaderboard-table .rank-3 .rank { color: #cd7f32; }
+#leaderboard-table .agent-name {
+  color: #4488ff;
+  font-weight: bold;
+}
+#leaderboard-table .streak {
+  color: #ff4444;
+  font-weight: bold;
+}
+#leaderboard-table .wins { color: #44ff44; }
+#leaderboard-table .losses { color: #888; }
+.empty-board {
+  color: #555;
+  text-align: center;
+  padding: 1rem !important;
+}
+
 /* Agent message panels */
 #agent-panels {
   display: flex;

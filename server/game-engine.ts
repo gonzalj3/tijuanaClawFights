@@ -1,16 +1,30 @@
 import { Match } from "./match.ts";
 import { TICK_MS } from "./protocol.ts";
 import type { ServerWebSocket } from "bun";
-import type { SpectatorMessage } from "./protocol.ts";
+import type { SpectatorMessage, LeaderboardEntry } from "./protocol.ts";
 
 export type AgentSocket = ServerWebSocket<{ agentId: string; matchId?: string; fighterIndex?: 0 | 1 }>;
 export type SpectatorSocket = ServerWebSocket<{ spectator: true }>;
+
+// ─── Agent Stats ────────────────────────────────────────────────
+interface AgentStats {
+  name: string;
+  winStreak: number;
+  bestStreak: number;
+  totalWins: number;
+  totalLosses: number;
+  lastActive: number; // timestamp
+}
+
+const LEADERBOARD_SIZE = 12;
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 export class GameEngine {
   matches = new Map<string, Match>();
   agentSockets = new Map<string, AgentSocket>(); // agentId → socket
   spectators = new Set<SpectatorSocket>();
   private tickInterval: ReturnType<typeof setInterval> | null = null;
+  private agentStats = new Map<string, AgentStats>(); // agent name → stats
 
   start(): void {
     if (this.tickInterval) return;
@@ -31,6 +45,9 @@ export class GameEngine {
     match.onEnd = (m) => {
       const endMsg = m.getEndMessage();
 
+      // Record stats
+      this.recordMatchResult(name0, name1, endMsg.winner);
+
       // Notify agents
       const sock0 = this.agentSockets.get(agent0Id);
       const sock1 = this.agentSockets.get(agent1Id);
@@ -48,6 +65,9 @@ export class GameEngine {
         matchId: m.id,
         ...endMsg,
       });
+
+      // Broadcast updated leaderboard
+      this.broadcastToSpectators(this.getLeaderboardMessage());
 
       // Remove match after a short delay
       setTimeout(() => this.matches.delete(id), 2000);
@@ -117,6 +137,66 @@ export class GameEngine {
         this.spectators.delete(ws);
       }
     }
+  }
+
+  private getOrCreateStats(name: string): AgentStats {
+    let stats = this.agentStats.get(name);
+    if (!stats) {
+      stats = { name, winStreak: 0, bestStreak: 0, totalWins: 0, totalLosses: 0, lastActive: Date.now() };
+      this.agentStats.set(name, stats);
+    }
+    return stats;
+  }
+
+  private recordMatchResult(name0: string, name1: string, winner: string | null): void {
+    const stats0 = this.getOrCreateStats(name0);
+    const stats1 = this.getOrCreateStats(name1);
+    stats0.lastActive = Date.now();
+    stats1.lastActive = Date.now();
+
+    if (winner === name0) {
+      stats0.totalWins++;
+      stats0.winStreak++;
+      if (stats0.winStreak > stats0.bestStreak) stats0.bestStreak = stats0.winStreak;
+      stats1.totalLosses++;
+      stats1.winStreak = 0;
+    } else if (winner === name1) {
+      stats1.totalWins++;
+      stats1.winStreak++;
+      if (stats1.winStreak > stats1.bestStreak) stats1.bestStreak = stats1.winStreak;
+      stats0.totalLosses++;
+      stats0.winStreak = 0;
+    } else {
+      // Draw — both streaks reset
+      stats0.winStreak = 0;
+      stats1.winStreak = 0;
+    }
+  }
+
+  getLeaderboardMessage(): SpectatorMessage {
+    const now = Date.now();
+    const entries: LeaderboardEntry[] = [];
+
+    for (const stats of this.agentStats.values()) {
+      // Only include agents active this week
+      if (now - stats.lastActive > WEEK_MS) continue;
+      entries.push({
+        rank: 0,
+        name: stats.name,
+        winStreak: stats.winStreak,
+        totalWins: stats.totalWins,
+        totalLosses: stats.totalLosses,
+      });
+    }
+
+    // Sort by current win streak (desc), then total wins (desc)
+    entries.sort((a, b) => b.winStreak - a.winStreak || b.totalWins - a.totalWins);
+
+    // Assign ranks and trim to top 12
+    const top = entries.slice(0, LEADERBOARD_SIZE);
+    top.forEach((e, i) => (e.rank = i + 1));
+
+    return { type: "leaderboard", entries: top };
   }
 
   getMatchList(): SpectatorMessage {

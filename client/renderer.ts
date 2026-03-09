@@ -1,6 +1,6 @@
 import { Application, Graphics, Text, TextStyle, Sprite, Container } from "pixi.js";
 import { connectSpectator } from "./spectator-client.ts";
-import type { MatchStateMsg, MatchStartMsg, MatchEndMsg, PausedMsg, AgentRelayMsg, FighterState } from "./spectator-client.ts";
+import type { MatchStateMsg, MatchStartMsg, MatchEndMsg, PausedMsg, AgentRelayMsg, LeaderboardMsg, FighterState } from "./spectator-client.ts";
 import { FighterSprite, ScreenShake, loadAllAssets, actionToAnim } from "./sprites.ts";
 import type { LoadedAssets } from "./sprites.ts";
 
@@ -317,6 +317,22 @@ async function main() {
     },
     onAgentMsg(msg: AgentRelayMsg) {
       appendAgentMsg(msg.fighter, msg.direction, msg.msg);
+    },
+    onLeaderboard(msg: LeaderboardMsg) {
+      const tbody = document.getElementById("leaderboard-body")!;
+      if (msg.entries.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-board">No matches yet...</td></tr>';
+        return;
+      }
+      tbody.innerHTML = msg.entries.map((e) =>
+        `<tr class="rank-${e.rank}">` +
+        `<td class="rank">#${e.rank}</td>` +
+        `<td class="agent-name">${e.name}</td>` +
+        `<td class="streak">${e.winStreak}${e.winStreak > 0 ? "\uD83D\uDD25" : ""}</td>` +
+        `<td class="wins">${e.totalWins}</td>` +
+        `<td class="losses">${e.totalLosses}</td>` +
+        `</tr>`
+      ).join("");
     },
   });
 

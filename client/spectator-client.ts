@@ -47,7 +47,18 @@ export type AgentRelayMsg = {
   msg: any;
 };
 
-export type SpectatorMsg = MatchStateMsg | MatchStartMsg | MatchEndMsg | PausedMsg | AgentRelayMsg | { type: "match_list"; matches: any[] };
+export type LeaderboardMsg = {
+  type: "leaderboard";
+  entries: Array<{
+    rank: number;
+    name: string;
+    winStreak: number;
+    totalWins: number;
+    totalLosses: number;
+  }>;
+};
+
+export type SpectatorMsg = MatchStateMsg | MatchStartMsg | MatchEndMsg | PausedMsg | AgentRelayMsg | LeaderboardMsg | { type: "match_list"; matches: any[] };
 
 export type SpectatorCallbacks = {
   onMatchState: (msg: MatchStateMsg) => void;
@@ -55,6 +66,7 @@ export type SpectatorCallbacks = {
   onMatchEnd: (msg: MatchEndMsg) => void;
   onPaused: (msg: PausedMsg) => void;
   onAgentMsg: (msg: AgentRelayMsg) => void;
+  onLeaderboard: (msg: LeaderboardMsg) => void;
   onConnect: () => void;
   onDisconnect: () => void;
 };
@@ -103,6 +115,9 @@ export function connectSpectator(callbacks: SpectatorCallbacks): SpectatorConnec
           break;
         case "agent_msg":
           callbacks.onAgentMsg(msg);
+          break;
+        case "leaderboard":
+          callbacks.onLeaderboard(msg);
           break;
       }
     };
