@@ -95,5 +95,8 @@ export function handleAgentClose(
         match.forfeit(fighterIndex ?? 0);
       }
     }
+
+    // Check if NPC should respawn (arena may be empty now)
+    engine.checkNpcRespawn();
   }
 }

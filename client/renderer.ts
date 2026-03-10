@@ -204,8 +204,7 @@ async function main() {
     log.scrollTop = log.scrollHeight;
   }
 
-  // NPC buttons
-  const npcBtn = document.getElementById("npc-btn")! as HTMLButtonElement;
+  // NPC dismiss button
   const dismissBtn = document.getElementById("dismiss-btn")! as HTMLButtonElement;
 
   // Connect to server
@@ -308,14 +307,7 @@ async function main() {
       }, 4000);
     },
     onArenaStatus(msg: ArenaStatusMsg) {
-      if (msg.hasNpc) {
-        npcBtn.style.display = "none";
-        dismissBtn.style.display = "";
-      } else {
-        dismissBtn.style.display = "none";
-        // Show NPC button when no NPC is active
-        npcBtn.style.display = "";
-      }
+      dismissBtn.style.display = msg.hasNpc ? "" : "none";
     },
     onAgentMsg(msg: AgentRelayMsg) {
       appendAgentMsg(msg.fighter, msg.direction, msg.msg);
@@ -338,9 +330,6 @@ async function main() {
     },
   });
 
-  npcBtn.addEventListener("click", () => {
-    conn.send({ type: "spawn_npc" });
-  });
   dismissBtn.addEventListener("click", () => {
     conn.send({ type: "dismiss_npc" });
   });

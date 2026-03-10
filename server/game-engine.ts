@@ -36,6 +36,8 @@ export class GameEngine {
     if (this.tickInterval) return;
     this.tickInterval = setInterval(() => this.tick(), TICK_MS);
     console.log(`Game engine started (${TICK_MS}ms ticks)`);
+    // Auto-spawn NPC so the arena is never empty
+    this.spawnNpc();
   }
 
   stop(): void {
@@ -308,6 +310,19 @@ export class GameEngine {
     this.npc = null;
     this.npcMatchId = null;
     this.broadcastArenaStatus();
+    // Re-spawn NPC when arena is empty (check after a delay to let agents leave)
+    this.checkNpcRespawn();
+  }
+
+  /** Re-spawn NPC if no real agents remain */
+  checkNpcRespawn(): void {
+    setTimeout(() => {
+      if (this.npc) return; // already respawned
+      if (this.agentSockets.size === 0) {
+        console.log(`[NPC] No agents connected, respawning`);
+        this.spawnNpc();
+      }
+    }, 3000);
   }
 
   /** Track which match the NPC is in (called from createMatch) */
