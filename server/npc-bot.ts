@@ -1,16 +1,13 @@
-import type { Action, FighterState } from "./protocol.ts";
+import type { Action } from "./protocol.ts";
+import { ATTACK_RANGE } from "./protocol.ts";
 import type { Match } from "./match.ts";
 
 const NPC_NAME = "NPC Claw Fighter";
-const REACTION_DELAY_MS = 600; // 3 ticks late — deliberately bad
-
-// Predictable cycle: punch → punch → kick → block → move_left → move_right
-const PATTERN: Action[] = ["punch", "punch", "kick", "block", "move_left", "move_right"];
+const REACTION_DELAY_MS = 300; // 1.5 ticks late — slow but not useless
 
 export class NpcBot {
   readonly id: string;
   readonly name = NPC_NAME;
-  private patternIndex = 0;
   private dismissed = false;
   private actionTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -18,7 +15,6 @@ export class NpcBot {
     this.id = `npc-${crypto.randomUUID()}`;
   }
 
-  /** Signal the NPC to leave after current match (won't re-queue) */
   dismiss(): void {
     this.dismissed = true;
   }
@@ -27,23 +23,54 @@ export class NpcBot {
     return this.dismissed;
   }
 
-  /** Called each tick when the NPC is in a match — queues an action with delay */
+  /** Called each tick when the NPC is in a match */
   onTick(match: Match, fighterIndex: 0 | 1): void {
-    // Clear any pending action from previous tick
     if (this.actionTimer) {
       clearTimeout(this.actionTimer);
     }
 
-    // Delayed reaction — 600ms means the action arrives ~3 ticks late
     this.actionTimer = setTimeout(() => {
       if (match.finished) return;
-      const action = PATTERN[this.patternIndex % PATTERN.length]!;
-      this.patternIndex++;
+
+      const me = match.fighters[fighterIndex];
+      const opp = match.fighters[fighterIndex === 0 ? 1 : 0];
+      const dist = Math.abs(me.x - opp.x);
+      const roll = Math.random();
+
+      let action: Action;
+
+      if (dist > ATTACK_RANGE) {
+        // Too far — move toward opponent
+        action = me.x < opp.x ? "move_right" : "move_left";
+      } else {
+        // In range — fight
+        if (opp.lastAction && (opp.lastAction === "punch" || opp.lastAction === "kick" || opp.lastAction === "special")) {
+          // Opponent attacked last tick — block or jump sometimes
+          if (roll < 0.3) {
+            action = "block";
+          } else if (roll < 0.45) {
+            action = "jump";
+          } else {
+            action = roll < 0.7 ? "punch" : "kick";
+          }
+        } else {
+          // Opponent didn't attack — be aggressive
+          if (roll < 0.45) {
+            action = "punch";
+          } else if (roll < 0.75) {
+            action = "kick";
+          } else if (roll < 0.85) {
+            action = "special";
+          } else {
+            action = "block";
+          }
+        }
+      }
+
       match.setAction(fighterIndex, action);
     }, REACTION_DELAY_MS);
   }
 
-  /** Clean up timers */
   destroy(): void {
     if (this.actionTimer) {
       clearTimeout(this.actionTimer);
