@@ -1,5 +1,7 @@
 import { Match } from "./match.ts";
 import { TICK_MS } from "./protocol.ts";
+import { NpcBot } from "./npc-bot.ts";
+import type { Matchmaker } from "./matchmaker.ts";
 import type { ServerWebSocket } from "bun";
 import type { SpectatorMessage, LeaderboardEntry } from "./protocol.ts";
 
@@ -23,8 +25,12 @@ export class GameEngine {
   matches = new Map<string, Match>();
   agentSockets = new Map<string, AgentSocket>(); // agentId → socket
   spectators = new Set<SpectatorSocket>();
+  matchmaker: Matchmaker | null = null; // set after construction
   private tickInterval: ReturnType<typeof setInterval> | null = null;
   private agentStats = new Map<string, AgentStats>(); // agent name → stats
+  private npc: NpcBot | null = null;
+  private npcMatchId: string | null = null;
+  private npcFighterIndex: 0 | 1 = 0;
 
   start(): void {
     if (this.tickInterval) return;
@@ -69,8 +75,51 @@ export class GameEngine {
       // Broadcast updated leaderboard
       this.broadcastToSpectators(this.getLeaderboardMessage());
 
+      // Handle NPC match end
+      if (this.npcMatchId === id) {
+        this.npcMatchId = null;
+        if (this.npc) {
+          if (this.npc.isDismissed) {
+            // NPC was told to leave — clean up
+            this.destroyNpc();
+          } else {
+            // Re-queue NPC for next match
+            this.matchmaker?.enqueue(this.npc.id, this.npc.name);
+          }
+        }
+      }
+
+      // Auto re-queue or kick agents via matchmaker (skip NPC — handled above)
+      if (this.matchmaker) {
+        const npcId = this.npc?.id;
+        if (agent0Id !== npcId && agent1Id !== npcId) {
+          this.matchmaker.onMatchEnd(agent0Id, name0, agent1Id, name1);
+        } else {
+          // Only handle the non-NPC agent
+          const realId = agent0Id === npcId ? agent1Id : agent0Id;
+          const realName = agent0Id === npcId ? name1 : name0;
+          // Simulate onMatchEnd for just the real agent
+          const count = ((this.matchmaker as any).fightCounts?.get(realId) ?? 0) + 1;
+          (this.matchmaker as any).fightCounts?.set(realId, count);
+          if (count >= 3) {
+            console.log(`[Matchmaker] ${realName} kicked after ${count} fights`);
+            const sock = this.agentSockets.get(realId);
+            sock?.send(JSON.stringify({ type: "kicked", reason: "3 rounds completed" }));
+            (this.matchmaker as any).fightCounts?.delete(realId);
+          } else {
+            console.log(`[Matchmaker] ${realName} auto re-queued (${count}/3 fights)`);
+            this.matchmaker.enqueue(realId, realName);
+          }
+        }
+      }
+
       // Remove match after a short delay
-      setTimeout(() => this.matches.delete(id), 2000);
+      setTimeout(() => {
+        this.matches.delete(id);
+        this.broadcastArenaStatus();
+      }, 2000);
+
+      this.broadcastArenaStatus();
     };
 
     this.matches.set(id, match);
@@ -87,12 +136,20 @@ export class GameEngine {
       sock1.data.fighterIndex = 1;
     }
 
+    // Track NPC match
+    if (this.npc) {
+      if (agent0Id === this.npc.id) this.setNpcMatch(id, 0);
+      else if (agent1Id === this.npc.id) this.setNpcMatch(id, 1);
+    }
+
     // Notify spectators of new match
     this.broadcastToSpectators({
       type: "match_start",
       matchId: id,
       fighters: [name0, name1],
     });
+
+    this.broadcastArenaStatus();
 
     return match;
   }
@@ -102,6 +159,11 @@ export class GameEngine {
       if (match.finished) continue;
 
       match.processTick();
+
+      // NPC tick — feed game state to the bot
+      if (this.npc && this.npcMatchId === matchId) {
+        this.npc.onTick(match, this.npcFighterIndex);
+      }
 
       // Send state to agents
       for (const [agentId, sock] of this.agentSockets) {
@@ -210,5 +272,65 @@ export class GameEngine {
       }
     }
     return { type: "match_list", matches };
+  }
+
+  // ─── NPC Management ──────────────────────────────────────────
+
+  spawnNpc(): void {
+    if (this.npc) return; // already active
+    this.npc = new NpcBot();
+    // Register NPC as a virtual agent (no real socket)
+    console.log(`[NPC] Spawned: ${this.npc.name} (${this.npc.id})`);
+    // Enqueue via matchmaker
+    this.matchmaker?.enqueue(this.npc.id, this.npc.name);
+    this.broadcastArenaStatus();
+  }
+
+  dismissNpc(): void {
+    if (!this.npc) return;
+    if (this.npcMatchId) {
+      // NPC is in a match — flag it to leave after match ends
+      this.npc.dismiss();
+      console.log(`[NPC] Will leave after current match`);
+    } else {
+      // NPC is idle/queued — remove immediately
+      this.matchmaker?.dequeue(this.npc.id);
+      this.destroyNpc();
+    }
+    this.broadcastArenaStatus();
+  }
+
+  private destroyNpc(): void {
+    if (!this.npc) return;
+    this.npc.destroy();
+    this.matchmaker?.dequeue(this.npc.id);
+    console.log(`[NPC] Removed`);
+    this.npc = null;
+    this.npcMatchId = null;
+    this.broadcastArenaStatus();
+  }
+
+  /** Track which match the NPC is in (called from createMatch) */
+  setNpcMatch(matchId: string, fighterIndex: 0 | 1): void {
+    this.npcMatchId = matchId;
+    this.npcFighterIndex = fighterIndex;
+  }
+
+  get hasNpc(): boolean {
+    return this.npc !== null;
+  }
+
+  get npcId(): string | null {
+    return this.npc?.id ?? null;
+  }
+
+  broadcastArenaStatus(): void {
+    const hasMatch = [...this.matches.values()].some((m) => !m.finished);
+    this.broadcastToSpectators({
+      type: "arena_status",
+      hasNpc: this.npc !== null,
+      hasMatch,
+      queueSize: this.matchmaker?.getQueueSize() ?? 0,
+    });
   }
 }

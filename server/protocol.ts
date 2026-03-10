@@ -45,7 +45,8 @@ export type ServerAgentMessage =
       winner: string | null; // null = draw
       reason: "ko" | "timeout";
     }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string }
+  | { type: "kicked"; reason: string };
 
 // ─── Animation Events (for spectators) ─────────────────────────
 export interface AnimationEvent {
@@ -83,8 +84,10 @@ export type SpectatorMessage =
       reason: "ko" | "timeout";
     }
   | {
-      type: "paused";
-      paused: boolean;
+      type: "arena_status";
+      hasNpc: boolean;
+      hasMatch: boolean;
+      queueSize: number;
     }
   | {
       type: "agent_msg";
@@ -109,8 +112,8 @@ export interface LeaderboardEntry {
 
 // ─── Spectator → Server Messages ───────────────────────────────
 export type SpectatorControlMessage =
-  | { type: "pause" }
-  | { type: "resume" };
+  | { type: "spawn_npc" }
+  | { type: "dismiss_npc" };
 
 // ─── Combat Constants ──────────────────────────────────────────
 export const ARENA_WIDTH = 10;

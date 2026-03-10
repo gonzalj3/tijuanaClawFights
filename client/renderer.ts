@@ -1,6 +1,6 @@
 import { Application, Graphics, Text, TextStyle, Sprite, Container } from "pixi.js";
 import { connectSpectator } from "./spectator-client.ts";
-import type { MatchStateMsg, MatchStartMsg, MatchEndMsg, PausedMsg, AgentRelayMsg, LeaderboardMsg, FighterState } from "./spectator-client.ts";
+import type { MatchStateMsg, MatchStartMsg, MatchEndMsg, ArenaStatusMsg, AgentRelayMsg, LeaderboardMsg, FighterState } from "./spectator-client.ts";
 import { FighterSprite, ScreenShake, loadAllAssets, actionToAnim } from "./sprites.ts";
 import type { LoadedAssets } from "./sprites.ts";
 
@@ -204,9 +204,9 @@ async function main() {
     log.scrollTop = log.scrollHeight;
   }
 
-  // Pause button
-  const pauseBtn = document.getElementById("pause-btn")! as HTMLButtonElement;
-  let isPaused = false;
+  // NPC buttons
+  const npcBtn = document.getElementById("npc-btn")! as HTMLButtonElement;
+  const dismissBtn = document.getElementById("dismiss-btn")! as HTMLButtonElement;
 
   // Connect to server
   const conn = connectSpectator({
@@ -299,7 +299,7 @@ async function main() {
         : "DRAW!";
       showAnnouncement(resultText, msg.winner ? 0xff4444 : 0xffcc00);
       setTimeout(() => {
-        matchInfoText.text = isPaused ? "PAUSED - waiting for resume..." : "Waiting for next match...";
+        matchInfoText.text = "Waiting for next match...";
         currentFighters = null;
         targetFighters = null;
         prevFighters = null;
@@ -307,12 +307,14 @@ async function main() {
         timerText.text = "";
       }, 4000);
     },
-    onPaused(msg: PausedMsg) {
-      isPaused = msg.paused;
-      pauseBtn.textContent = isPaused ? "Resume" : "Pause";
-      pauseBtn.classList.toggle("paused", isPaused);
-      if (isPaused && !matchActive) {
-        matchInfoText.text = "PAUSED - waiting for resume...";
+    onArenaStatus(msg: ArenaStatusMsg) {
+      if (msg.hasNpc) {
+        npcBtn.style.display = "none";
+        dismissBtn.style.display = "";
+      } else {
+        dismissBtn.style.display = "none";
+        // Show NPC button when no NPC is active
+        npcBtn.style.display = "";
       }
     },
     onAgentMsg(msg: AgentRelayMsg) {
@@ -336,12 +338,11 @@ async function main() {
     },
   });
 
-  pauseBtn.addEventListener("click", () => {
-    if (isPaused) {
-      conn.send({ type: "resume" });
-    } else {
-      conn.send({ type: "pause" });
-    }
+  npcBtn.addEventListener("click", () => {
+    conn.send({ type: "spawn_npc" });
+  });
+  dismissBtn.addEventListener("click", () => {
+    conn.send({ type: "dismiss_npc" });
   });
 
   function showAnnouncement(text: string, color: number) {

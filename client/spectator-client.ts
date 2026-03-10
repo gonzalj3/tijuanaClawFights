@@ -34,9 +34,11 @@ export type AnimationEvent = {
   text: string;
 };
 
-export type PausedMsg = {
-  type: "paused";
-  paused: boolean;
+export type ArenaStatusMsg = {
+  type: "arena_status";
+  hasNpc: boolean;
+  hasMatch: boolean;
+  queueSize: number;
 };
 
 export type AgentRelayMsg = {
@@ -58,13 +60,13 @@ export type LeaderboardMsg = {
   }>;
 };
 
-export type SpectatorMsg = MatchStateMsg | MatchStartMsg | MatchEndMsg | PausedMsg | AgentRelayMsg | LeaderboardMsg | { type: "match_list"; matches: any[] };
+export type SpectatorMsg = MatchStateMsg | MatchStartMsg | MatchEndMsg | ArenaStatusMsg | AgentRelayMsg | LeaderboardMsg | { type: "match_list"; matches: any[] };
 
 export type SpectatorCallbacks = {
   onMatchState: (msg: MatchStateMsg) => void;
   onMatchStart: (msg: MatchStartMsg) => void;
   onMatchEnd: (msg: MatchEndMsg) => void;
-  onPaused: (msg: PausedMsg) => void;
+  onArenaStatus: (msg: ArenaStatusMsg) => void;
   onAgentMsg: (msg: AgentRelayMsg) => void;
   onLeaderboard: (msg: LeaderboardMsg) => void;
   onConnect: () => void;
@@ -110,8 +112,8 @@ export function connectSpectator(callbacks: SpectatorCallbacks): SpectatorConnec
         case "match_end":
           callbacks.onMatchEnd(msg);
           break;
-        case "paused":
-          callbacks.onPaused(msg);
+        case "arena_status":
+          callbacks.onArenaStatus(msg);
           break;
         case "agent_msg":
           callbacks.onAgentMsg(msg);

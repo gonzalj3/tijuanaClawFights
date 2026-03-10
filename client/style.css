@@ -40,8 +40,10 @@ h1 {
 /* Controls */
 #controls {
   margin: 0.5rem 0;
+  display: flex;
+  gap: 0.5rem;
 }
-#pause-btn {
+#controls button {
   background: #333;
   color: #e0e0e0;
   border: 2px solid #555;
@@ -54,14 +56,17 @@ h1 {
   letter-spacing: 2px;
   transition: background 0.15s, border-color 0.15s;
 }
-#pause-btn:hover {
+#controls button:hover {
   background: #444;
   border-color: #777;
 }
-#pause-btn.paused {
-  background: #442222;
-  border-color: #ff4444;
-  color: #ff4444;
+#npc-btn {
+  border-color: #ff4444 !important;
+  color: #ff4444 !important;
+}
+#dismiss-btn {
+  border-color: #44ff44 !important;
+  color: #44ff44 !important;
 }
 
 /* Leaderboard */

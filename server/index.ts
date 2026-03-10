@@ -9,6 +9,7 @@ const PORT = Number(process.env.PORT) || 3000;
 
 const engine = new GameEngine();
 const matchmaker = new Matchmaker(engine);
+engine.matchmaker = matchmaker;
 
 // Serve static client files
 function serveStatic(path: string): Response {
@@ -80,6 +81,14 @@ const server = Bun.serve({
         engine.spectators.add(ws as any);
         ws.send(JSON.stringify(engine.getMatchList()));
         ws.send(JSON.stringify(engine.getLeaderboardMessage()));
+        // Send current arena status
+        const hasMatch = [...engine.matches.values()].some((m) => !m.finished);
+        ws.send(JSON.stringify({
+          type: "arena_status",
+          hasNpc: engine.hasNpc,
+          hasMatch,
+          queueSize: matchmaker.getQueueSize(),
+        }));
         console.log("[Spectator] connected");
       }
     },
@@ -94,12 +103,10 @@ const server = Bun.serve({
         // Handle spectator control messages
         try {
           const msg: SpectatorControlMessage = JSON.parse(raw);
-          if (msg.type === "pause") {
-            matchmaker.pause();
-            engine.broadcastToSpectators({ type: "paused", paused: true });
-          } else if (msg.type === "resume") {
-            matchmaker.resume();
-            engine.broadcastToSpectators({ type: "paused", paused: false });
+          if (msg.type === "spawn_npc") {
+            engine.spawnNpc();
+          } else if (msg.type === "dismiss_npc") {
+            engine.dismissNpc();
           }
         } catch {}
       }
