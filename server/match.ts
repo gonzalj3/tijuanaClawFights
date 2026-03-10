@@ -57,6 +57,18 @@ export class Match {
     this.fighters = [newFighter(name0, 2), newFighter(name1, 8)];
   }
 
+  /** Force-end the match because a fighter disconnected. The other fighter wins. */
+  forfeit(disconnectedIndex: 0 | 1): void {
+    if (this.finished) return;
+    this.finished = true;
+    this.winReason = "ko";
+    const winnerIndex = disconnectedIndex === 0 ? 1 : 0;
+    this.winner = this.fighters[winnerIndex].name;
+    this.fighters[disconnectedIndex].hp = 0;
+    this.events.push({ type: "ko", fighter: winnerIndex, text: "FORFEIT!" });
+    this.onEnd?.(this);
+  }
+
   setAction(index: 0 | 1, action: Action): boolean {
     const f = this.fighters[index];
     if (!f || this.finished) return false;

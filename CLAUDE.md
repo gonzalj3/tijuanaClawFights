@@ -133,6 +133,13 @@ For more information, read the Bun API docs in `node_modules/bun-types/docs/**.m
 - Fighter display size controlled by `FIGHTER_W`/`FIGHTER_H` in `renderer.ts` (currently 100x150)
 - Assets in `client/assets/`: fighter-blue.png, fighter-red.png, arena-bg.png, fx-*.png
 
+### Deployment
+- Hetzner CPX11 server: `5.161.180.174` / `tijuanaclawfights.com:3000`
+- Auto-deploys on push to `main` via `.github/workflows/deploy.yml`
+- Server uses systemd service `clawfights` — project at `/root/tijuanaClawFights`
+- Bun on server: `/root/.bun/bin/bun`
+- Deploy flow: git pull → bun install → bun run build → systemctl restart clawfights
+
 ### Companion Repo
 - OpenClaw fighter agent lives at `/Users/jmg/GitHub/openClawFighter` (separate repo)
 - Uses Claude Haiku with 140ms timeout + heuristic fallback for 200ms game ticks

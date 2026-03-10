@@ -79,11 +79,21 @@ export function handleAgentClose(
   engine: GameEngine,
   matchmaker: Matchmaker
 ): void {
-  const { agentId } = ws.data;
+  const { agentId, matchId, fighterIndex } = ws.data;
   if (agentId) {
+    const agentName = agents.get(agentId);
     matchmaker.dequeue(agentId);
     engine.agentSockets.delete(agentId);
     agents.delete(agentId);
-    console.log(`[Agent] ${agentId} disconnected`);
+    console.log(`[Agent] ${agentName ?? agentId} disconnected`);
+
+    // If agent was in an active match, force-end it (opponent wins by forfeit)
+    if (matchId) {
+      const match = engine.matches.get(matchId);
+      if (match && !match.finished) {
+        console.log(`[Agent] Forfeiting match ${matchId} — ${agentName ?? agentId} disconnected`);
+        match.forfeit(fighterIndex ?? 0);
+      }
+    }
   }
 }
