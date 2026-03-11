@@ -154,7 +154,29 @@ export class GameEngine {
 
       // NPC tick — feed game state to the bot
       if (this.npc && this.npcMatchId === matchId) {
+        const npcState = match.getAgentState(this.npcFighterIndex);
+        // Relay outgoing state to spectators (like real agents)
+        this.broadcastToSpectators({
+          type: "agent_msg",
+          fighter: this.npcFighterIndex,
+          name: match.fighters[this.npcFighterIndex].name,
+          direction: "out",
+          msg: npcState,
+        });
+
         this.npc.onTick(match, this.npcFighterIndex);
+
+        // Relay NPC's chosen action to spectators (like real agents' incoming messages)
+        const npcAction = match.fighters[this.npcFighterIndex].pendingAction;
+        if (npcAction) {
+          this.broadcastToSpectators({
+            type: "agent_msg",
+            fighter: this.npcFighterIndex,
+            name: match.fighters[this.npcFighterIndex].name,
+            direction: "in",
+            msg: { type: "action", action: npcAction },
+          });
+        }
       }
 
       // Send state to agents
