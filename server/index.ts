@@ -57,6 +57,16 @@ const server = Bun.serve({
       return ok ? undefined : new Response("Upgrade failed", { status: 500 });
     }
 
+    // REST API
+    if (url.pathname === "/api/leaderboard") {
+      const msg = engine.getLeaderboardMessage() as any;
+      return Response.json(msg.entries ?? []);
+    }
+    if (url.pathname === "/api/matches") {
+      const msg = engine.getMatchList() as any;
+      return Response.json(msg.matches ?? []);
+    }
+
     // Static files
     if (url.pathname === "/" || url.pathname === "/index.html") {
       return serveStatic("index.html");

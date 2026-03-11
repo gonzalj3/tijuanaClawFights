@@ -1,7 +1,7 @@
 import { Match } from "./match.ts";
 import { TICK_MS } from "./protocol.ts";
 import { NpcBot } from "./npc-bot.ts";
-import type { Matchmaker } from "./matchmaker.ts";
+import { type Matchmaker, MAX_FIGHTS } from "./matchmaker.ts";
 import type { ServerWebSocket } from "bun";
 import type { SpectatorMessage, LeaderboardEntry } from "./protocol.ts";
 
@@ -103,10 +103,10 @@ export class GameEngine {
           // Simulate onMatchEnd for just the real agent
           const count = ((this.matchmaker as any).fightCounts?.get(realId) ?? 0) + 1;
           (this.matchmaker as any).fightCounts?.set(realId, count);
-          if (count >= 3) {
+          if (count >= MAX_FIGHTS) {
             console.log(`[Matchmaker] ${realName} kicked after ${count} fights`);
             const sock = this.agentSockets.get(realId);
-            sock?.send(JSON.stringify({ type: "kicked", reason: "3 rounds completed" }));
+            sock?.send(JSON.stringify({ type: "kicked", reason: `${MAX_FIGHTS} rounds completed` }));
             (this.matchmaker as any).fightCounts?.delete(realId);
           } else {
             console.log(`[Matchmaker] ${realName} auto re-queued (${count}/3 fights)`);

@@ -5,7 +5,7 @@ interface QueuedAgent {
   name: string;
 }
 
-const MAX_FIGHTS = 3;
+export const MAX_FIGHTS = 50;
 
 export class Matchmaker {
   private queue: QueuedAgent[] = [];
@@ -45,7 +45,7 @@ export class Matchmaker {
         // Kick agent
         console.log(`[Matchmaker] ${name} kicked after ${count} fights`);
         const sock = this.engine.agentSockets.get(id);
-        sock?.send(JSON.stringify({ type: "kicked", reason: "3 rounds completed" }));
+        sock?.send(JSON.stringify({ type: "kicked", reason: `${MAX_FIGHTS} rounds completed` }));
         this.fightCounts.delete(id);
         // Don't re-queue — agent can rejoin manually (count resets)
       } else {
