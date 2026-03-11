@@ -1,6 +1,6 @@
 import type { ServerWebSocket } from "bun";
 import type { AgentMessage } from "./protocol.ts";
-import { MIN_RESPONSE_MS } from "./protocol.ts";
+import { MIN_RESPONSE_MS, TICK_MS } from "./protocol.ts";
 import type { GameEngine } from "./game-engine.ts";
 import type { Matchmaker } from "./matchmaker.ts";
 
@@ -12,6 +12,8 @@ export interface AgentData {
 
 // Registered agents: id → name
 const agents = new Map<string, string>();
+// Track last accepted action time per agent (one action per tick window)
+const lastActionAt = new Map<string, number>();
 
 export function handleAgentMessage(
   ws: ServerWebSocket<AgentData>,
@@ -74,14 +76,21 @@ export function handleAgentMessage(
         ws.send(JSON.stringify({ type: "error", message: "Not in a match" }));
         return;
       }
+      const now = Date.now();
       // Anti-heuristic: ignore actions that arrive too fast after state was sent
       const sentAt = engine.lastStateSentAt.get(ws.data.agentId);
-      if (sentAt && Date.now() - sentAt < MIN_RESPONSE_MS) {
+      if (sentAt && now - sentAt < MIN_RESPONSE_MS) {
         break; // silently drop — agent responded too fast
+      }
+      // Rate limit: only accept one action per tick window per agent
+      const lastAction = lastActionAt.get(ws.data.agentId);
+      if (lastAction && now - lastAction < TICK_MS) {
+        break; // silently drop — already acted this tick
       }
       const match = engine.matches.get(ws.data.matchId);
       if (match) {
         match.setAction(ws.data.fighterIndex, msg.action);
+        lastActionAt.set(ws.data.agentId, now);
       }
       break;
     }
@@ -99,6 +108,7 @@ export function handleAgentClose(
     matchmaker.removeAgent(agentId);
     engine.agentSockets.delete(agentId);
     agents.delete(agentId);
+    lastActionAt.delete(agentId);
     console.log(`[Agent] ${agentName ?? agentId} disconnected`);
 
     // If agent was in an active match, force-end it (opponent wins by forfeit)

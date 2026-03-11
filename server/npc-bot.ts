@@ -27,8 +27,8 @@ export class NpcBot {
   onTick(match: Match, fighterIndex: 0 | 1): void {
     if (match.finished) return;
 
-    // Skip ~50% of ticks to simulate slower reaction time (tuned for 400ms ticks)
-    if (Math.random() < 0.5) return;
+    // Skip ~70% of ticks to simulate slower reaction time (gives on-device LLMs a chance)
+    if (Math.random() < 0.7) return;
 
     const me = match.fighters[fighterIndex];
     const opp = match.fighters[fighterIndex === 0 ? 1 : 0];

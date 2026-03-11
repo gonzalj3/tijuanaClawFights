@@ -2,6 +2,7 @@ import { Match } from "./match.ts";
 import { TICK_MS } from "./protocol.ts";
 import { NpcBot } from "./npc-bot.ts";
 import { type Matchmaker, MAX_FIGHTS } from "./matchmaker.ts";
+import { loadStats, saveStats, cleanOldDays, getToday } from "./leaderboard-db.ts";
 import type { ServerWebSocket } from "bun";
 import type { SpectatorMessage, LeaderboardEntry } from "./protocol.ts";
 
@@ -19,7 +20,6 @@ interface AgentStats {
 }
 
 const LEADERBOARD_SIZE = 12;
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 export class GameEngine {
   matches = new Map<string, Match>();
@@ -35,6 +35,13 @@ export class GameEngine {
 
   start(): void {
     if (this.tickInterval) return;
+
+    // Load persisted stats for today, clean old days
+    const today = getToday();
+    this.agentStats = loadStats(today);
+    cleanOldDays(today);
+    console.log(`[Leaderboard] Loaded ${this.agentStats.size} agents for ${today}`);
+
     this.tickInterval = setInterval(() => this.tick(), TICK_MS);
     console.log(`Game engine started (${TICK_MS}ms ticks)`);
     // Auto-spawn NPC so the arena is never empty
@@ -249,15 +256,18 @@ export class GameEngine {
       stats0.winStreak = 0;
       stats1.winStreak = 0;
     }
+
+    // Persist to SQLite
+    const today = getToday();
+    saveStats(name0, stats0, today);
+    saveStats(name1, stats1, today);
   }
 
   getLeaderboardMessage(): SpectatorMessage {
-    const now = Date.now();
     const entries: LeaderboardEntry[] = [];
 
     for (const stats of this.agentStats.values()) {
-      // Only include agents active this week
-      if (now - stats.lastActive > WEEK_MS) continue;
+      // All in-memory stats are today's — no filtering needed
       entries.push({
         rank: 0,
         name: stats.name,

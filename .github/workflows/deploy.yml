@@ -17,5 +17,6 @@ jobs:
             cd /root/tijuanaClawFights
             git pull origin main
             /root/.bun/bin/bun install
+            mkdir -p data
             /root/.bun/bin/bun run build
             systemctl restart clawfights
