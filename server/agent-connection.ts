@@ -1,5 +1,6 @@
 import type { ServerWebSocket } from "bun";
 import type { AgentMessage } from "./protocol.ts";
+import { MIN_RESPONSE_MS } from "./protocol.ts";
 import type { GameEngine } from "./game-engine.ts";
 import type { Matchmaker } from "./matchmaker.ts";
 
@@ -72,6 +73,11 @@ export function handleAgentMessage(
       if (!ws.data.matchId || ws.data.fighterIndex === undefined) {
         ws.send(JSON.stringify({ type: "error", message: "Not in a match" }));
         return;
+      }
+      // Anti-heuristic: ignore actions that arrive too fast after state was sent
+      const sentAt = engine.lastStateSentAt.get(ws.data.agentId);
+      if (sentAt && Date.now() - sentAt < MIN_RESPONSE_MS) {
+        break; // silently drop — agent responded too fast
       }
       const match = engine.matches.get(ws.data.matchId);
       if (match) {

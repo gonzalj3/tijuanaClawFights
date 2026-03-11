@@ -26,6 +26,7 @@ export class GameEngine {
   agentSockets = new Map<string, AgentSocket>(); // agentId → socket
   spectators = new Set<SpectatorSocket>();
   matchmaker: Matchmaker | null = null; // set after construction
+  lastStateSentAt = new Map<string, number>(); // agentId → timestamp (for anti-heuristic rate limiting)
   private tickInterval: ReturnType<typeof setInterval> | null = null;
   private agentStats = new Map<string, AgentStats>(); // agent name → stats
   private npc: NpcBot | null = null;
@@ -185,6 +186,7 @@ export class GameEngine {
           try {
             const agentState = match.getAgentState(sock.data.fighterIndex);
             sock.send(JSON.stringify(agentState));
+            this.lastStateSentAt.set(agentId, Date.now());
             // Relay outgoing message to spectators
             this.broadcastToSpectators({
               type: "agent_msg",
