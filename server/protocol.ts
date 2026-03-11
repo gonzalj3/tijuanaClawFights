@@ -12,6 +12,7 @@ export type Action =
 export type AgentMessage =
   | { type: "register"; name: string; key: string }
   | { type: "join_queue" }
+  | { type: "leave_queue" }
   | { type: "action"; tick: number; action: Action };
 
 // ─── Server → Agent Messages ───────────────────────────────────

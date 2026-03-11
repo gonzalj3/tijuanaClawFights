@@ -60,6 +60,14 @@ export function handleAgentMessage(
       break;
     }
 
+    case "leave_queue": {
+      matchmaker.dequeue(ws.data.agentId);
+      const lqName = agents.get(ws.data.agentId);
+      console.log(`[Agent] ${lqName ?? ws.data.agentId} left queue`);
+      ws.send(JSON.stringify({ type: "queue_left" }));
+      break;
+    }
+
     case "action": {
       if (!ws.data.matchId || ws.data.fighterIndex === undefined) {
         ws.send(JSON.stringify({ type: "error", message: "Not in a match" }));
@@ -82,7 +90,7 @@ export function handleAgentClose(
   const { agentId, matchId, fighterIndex } = ws.data;
   if (agentId) {
     const agentName = agents.get(agentId);
-    matchmaker.dequeue(agentId);
+    matchmaker.removeAgent(agentId);
     engine.agentSockets.delete(agentId);
     agents.delete(agentId);
     console.log(`[Agent] ${agentName ?? agentId} disconnected`);

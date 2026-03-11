@@ -24,6 +24,11 @@ export class Matchmaker {
 
   dequeue(agentId: string): void {
     this.queue = this.queue.filter((a) => a.id !== agentId);
+  }
+
+  /** Full cleanup when agent disconnects */
+  removeAgent(agentId: string): void {
+    this.queue = this.queue.filter((a) => a.id !== agentId);
     this.fightCounts.delete(agentId);
   }
 
