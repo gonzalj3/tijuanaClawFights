@@ -93,8 +93,13 @@ export class GameEngine {
             // NPC was told to leave — clean up
             this.destroyNpc();
           } else {
-            // Re-queue NPC for next match
-            this.matchmaker?.enqueue(this.npc.id, this.npc.name);
+            // Re-queue NPC for next match (delayed to match agent rematch delay)
+            const npcRef = this.npc;
+            setTimeout(() => {
+              if (npcRef && !npcRef.isDismissed) {
+                this.matchmaker?.enqueue(npcRef.id, npcRef.name);
+              }
+            }, 5000);
           }
         }
       }

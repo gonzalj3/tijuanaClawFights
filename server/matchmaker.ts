@@ -6,6 +6,7 @@ interface QueuedAgent {
 }
 
 export const MAX_FIGHTS = 50;
+const REMATCH_DELAY_MS = 5000; // pause between fights so spectators can see results
 
 export class Matchmaker {
   private queue: QueuedAgent[] = [];
@@ -74,9 +75,9 @@ export class Matchmaker {
         this.fightCounts.delete(id);
         // Don't re-queue — agent can rejoin manually (count resets)
       } else {
-        // Auto re-queue
-        console.log(`[Matchmaker] ${name} auto re-queued (${count}/${MAX_FIGHTS} fights)`);
-        this.enqueue(id, name);
+        // Auto re-queue after delay so spectators can see results
+        const reId = id, reName = name;
+        setTimeout(() => this.enqueue(reId, reName), REMATCH_DELAY_MS);
       }
     }
   }
@@ -107,8 +108,8 @@ export class Matchmaker {
       sock.send(JSON.stringify({ type: "kicked", reason: `${MAX_FIGHTS} rounds completed` }));
       this.fightCounts.delete(agentId);
     } else {
-      console.log(`[Matchmaker] ${agentName} auto re-queued (${count}/${MAX_FIGHTS} fights)`);
-      this.enqueue(agentId, agentName);
+      // Auto re-queue after delay so spectators can see results
+      setTimeout(() => this.enqueue(agentId, agentName), REMATCH_DELAY_MS);
     }
   }
 
