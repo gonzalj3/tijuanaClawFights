@@ -11,12 +11,14 @@ export class Matchmaker {
   private queue: QueuedAgent[] = [];
   private matchCounter = 0;
   private fightCounts = new Map<string, number>(); // agentId → fight count
+  private noAutoRequeue = new Set<string>(); // agents that opted out of auto-requeue
 
   constructor(private engine: GameEngine) {}
 
   enqueue(agentId: string, agentName: string): void {
     // Don't double-queue
     if (this.queue.some((a) => a.id === agentId)) return;
+    this.noAutoRequeue.delete(agentId); // clear pause flag on explicit join
     this.queue.push({ id: agentId, name: agentName });
     console.log(`[Matchmaker] ${agentName} joined queue (${this.queue.length} waiting)`);
     this.tryMatch();
@@ -24,12 +26,14 @@ export class Matchmaker {
 
   dequeue(agentId: string): void {
     this.queue = this.queue.filter((a) => a.id !== agentId);
+    this.noAutoRequeue.add(agentId); // prevent auto-requeue after current match
   }
 
   /** Full cleanup when agent disconnects */
   removeAgent(agentId: string): void {
     this.queue = this.queue.filter((a) => a.id !== agentId);
     this.fightCounts.delete(agentId);
+    this.noAutoRequeue.delete(agentId);
   }
 
   getQueueSize(): number {
@@ -43,6 +47,12 @@ export class Matchmaker {
   /** Called by game engine when a match ends. Handles re-queue or kick. */
   onMatchEnd(agent0Id: string, agent0Name: string, agent1Id: string, agent1Name: string): void {
     for (const [id, name] of [[agent0Id, agent0Name], [agent1Id, agent1Name]] as const) {
+      // Check if agent opted out of auto-requeue (sent leave_queue during match)
+      if (this.noAutoRequeue.has(id)) {
+        console.log(`[Matchmaker] ${name} skipped auto re-queue (paused)`);
+        continue;
+      }
+
       const count = (this.fightCounts.get(id) ?? 0) + 1;
       this.fightCounts.set(id, count);
 
@@ -58,6 +68,27 @@ export class Matchmaker {
         console.log(`[Matchmaker] ${name} auto re-queued (${count}/${MAX_FIGHTS} fights)`);
         this.enqueue(id, name);
       }
+    }
+  }
+
+  /** Handle a single agent's post-match requeue (used for NPC opponent matches) */
+  onSingleAgentMatchEnd(agentId: string, agentName: string): void {
+    if (this.noAutoRequeue.has(agentId)) {
+      console.log(`[Matchmaker] ${agentName} skipped auto re-queue (paused)`);
+      return;
+    }
+
+    const count = (this.fightCounts.get(agentId) ?? 0) + 1;
+    this.fightCounts.set(agentId, count);
+
+    if (count >= MAX_FIGHTS) {
+      console.log(`[Matchmaker] ${agentName} kicked after ${count} fights`);
+      const sock = this.engine.agentSockets.get(agentId);
+      sock?.send(JSON.stringify({ type: "kicked", reason: `${MAX_FIGHTS} rounds completed` }));
+      this.fightCounts.delete(agentId);
+    } else {
+      console.log(`[Matchmaker] ${agentName} auto re-queued (${count}/${MAX_FIGHTS} fights)`);
+      this.enqueue(agentId, agentName);
     }
   }
 

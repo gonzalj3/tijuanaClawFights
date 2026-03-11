@@ -100,18 +100,8 @@ export class GameEngine {
           // Only handle the non-NPC agent
           const realId = agent0Id === npcId ? agent1Id : agent0Id;
           const realName = agent0Id === npcId ? name1 : name0;
-          // Simulate onMatchEnd for just the real agent
-          const count = ((this.matchmaker as any).fightCounts?.get(realId) ?? 0) + 1;
-          (this.matchmaker as any).fightCounts?.set(realId, count);
-          if (count >= MAX_FIGHTS) {
-            console.log(`[Matchmaker] ${realName} kicked after ${count} fights`);
-            const sock = this.agentSockets.get(realId);
-            sock?.send(JSON.stringify({ type: "kicked", reason: `${MAX_FIGHTS} rounds completed` }));
-            (this.matchmaker as any).fightCounts?.delete(realId);
-          } else {
-            console.log(`[Matchmaker] ${realName} auto re-queued (${count}/3 fights)`);
-            this.matchmaker.enqueue(realId, realName);
-          }
+          // Use single-agent handler (respects noAutoRequeue flag)
+          this.matchmaker.onSingleAgentMatchEnd(realId, realName);
         }
       }
 
