@@ -53,14 +53,24 @@ export class Matchmaker {
         continue;
       }
 
+      // Check socket is still alive before re-queuing (catches ghost connections)
+      const sock = this.engine.agentSockets.get(id);
+      if (!sock || sock.readyState !== 1) {
+        console.log(`[Matchmaker] ${name} socket dead, removing ghost agent`);
+        this.removeAgent(id);
+        this.engine.agentSockets.delete(id);
+        this.engine.lastStateSentAt.delete(id);
+        this.engine.checkNpcRespawn();
+        continue;
+      }
+
       const count = (this.fightCounts.get(id) ?? 0) + 1;
       this.fightCounts.set(id, count);
 
       if (count >= MAX_FIGHTS) {
         // Kick agent
         console.log(`[Matchmaker] ${name} kicked after ${count} fights`);
-        const sock = this.engine.agentSockets.get(id);
-        sock?.send(JSON.stringify({ type: "kicked", reason: `${MAX_FIGHTS} rounds completed` }));
+        sock.send(JSON.stringify({ type: "kicked", reason: `${MAX_FIGHTS} rounds completed` }));
         this.fightCounts.delete(id);
         // Don't re-queue — agent can rejoin manually (count resets)
       } else {
@@ -78,13 +88,23 @@ export class Matchmaker {
       return;
     }
 
+    // Check socket is still alive before re-queuing (catches ghost connections)
+    const sock = this.engine.agentSockets.get(agentId);
+    if (!sock || sock.readyState !== 1) {
+      console.log(`[Matchmaker] ${agentName} socket dead, removing ghost agent`);
+      this.removeAgent(agentId);
+      this.engine.agentSockets.delete(agentId);
+      this.engine.lastStateSentAt.delete(agentId);
+      this.engine.checkNpcRespawn();
+      return;
+    }
+
     const count = (this.fightCounts.get(agentId) ?? 0) + 1;
     this.fightCounts.set(agentId, count);
 
     if (count >= MAX_FIGHTS) {
       console.log(`[Matchmaker] ${agentName} kicked after ${count} fights`);
-      const sock = this.engine.agentSockets.get(agentId);
-      sock?.send(JSON.stringify({ type: "kicked", reason: `${MAX_FIGHTS} rounds completed` }));
+      sock.send(JSON.stringify({ type: "kicked", reason: `${MAX_FIGHTS} rounds completed` }));
       this.fightCounts.delete(agentId);
     } else {
       console.log(`[Matchmaker] ${agentName} auto re-queued (${count}/${MAX_FIGHTS} fights)`);

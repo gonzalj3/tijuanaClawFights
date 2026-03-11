@@ -85,6 +85,10 @@ const server = Bun.serve({
   },
 
   websocket: {
+    // Auto-close sockets that don't respond to pings within 30s
+    idleTimeout: 30,
+    sendPings: true,
+
     open(ws) {
       const data = ws.data as any;
       if (data.type === "spectator") {
