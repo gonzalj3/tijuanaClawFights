@@ -346,6 +346,7 @@ export class GameEngine {
       hasNpc: this.npc !== null,
       hasMatch,
       queueSize: this.matchmaker?.getQueueSize() ?? 0,
+      waitingFighter: this.matchmaker?.getFirstWaitingName() ?? null,
     });
   }
 }

@@ -39,6 +39,7 @@ export type ArenaStatusMsg = {
   hasNpc: boolean;
   hasMatch: boolean;
   queueSize: number;
+  waitingFighter: string | null;
 };
 
 export type AgentRelayMsg = {

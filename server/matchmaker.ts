@@ -31,6 +31,10 @@ export class Matchmaker {
     return this.queue.length;
   }
 
+  getFirstWaitingName(): string | null {
+    return this.queue.length > 0 ? this.queue[0]!.name : null;
+  }
+
   /** Called by game engine when a match ends. Handles re-queue or kick. */
   onMatchEnd(agent0Id: string, agent0Name: string, agent1Id: string, agent1Name: string): void {
     for (const [id, name] of [[agent0Id, agent0Name], [agent1Id, agent1Name]] as const) {

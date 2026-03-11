@@ -88,6 +88,7 @@ const server = Bun.serve({
           hasNpc: engine.hasNpc,
           hasMatch,
           queueSize: matchmaker.getQueueSize(),
+          waitingFighter: matchmaker.getFirstWaitingName(),
         }));
         console.log("[Spectator] connected");
       }

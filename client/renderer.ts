@@ -36,6 +36,7 @@ let timerText: Text;
 let matchInfoText: Text;
 let announcementText: Text;
 let announcementTimer = 0;
+let waitingFighterName: string | null = null;
 
 async function main() {
   statusEl = document.getElementById("status")!;
@@ -217,6 +218,7 @@ async function main() {
     },
     onMatchStart(msg: MatchStartMsg) {
       matchActive = true;
+      waitingFighterName = null;
       matchInfoText.text = "";
       showAnnouncement("FIGHT!", 0xffcc00);
       agentHeaders[0]!.textContent = msg.fighters[0];
@@ -308,6 +310,10 @@ async function main() {
     },
     onArenaStatus(msg: ArenaStatusMsg) {
       dismissBtn.style.display = msg.hasNpc ? "" : "none";
+      waitingFighterName = (!matchActive && msg.waitingFighter) ? msg.waitingFighter : null;
+      if (waitingFighterName) {
+        matchInfoText.text = `${waitingFighterName} waiting for challenger...`;
+      }
     },
     onAgentMsg(msg: AgentRelayMsg) {
       appendAgentMsg(msg.fighter, msg.direction, msg.msg);
@@ -344,6 +350,31 @@ async function main() {
   app.ticker.add((ticker) => {
     // Screen shake
     shake.update(gameLayer);
+
+    // Show idle fighter when waiting for a match
+    if (!currentFighters && waitingFighterName) {
+      const idleX = unitToX(5); // center of arena
+      fighter1.setState("idle");
+      if (fighter1.isFallback) {
+        fighter1.drawFallback(idleX, GROUND_Y, false);
+      } else {
+        fighter1.setPosition(idleX, GROUND_Y);
+        fighter1.setFacing(true); // face right
+      }
+      // Show name above
+      name1.text = waitingFighterName;
+      name1.x = idleX - name1.width / 2;
+      name1.y = GROUND_Y - FIGHTER_H - 38;
+      // Hide P2 elements
+      name2.text = "";
+      action1.text = "";
+      action2.text = "";
+      hp1Bg.clear();
+      hp1Fill.clear();
+      hp2Bg.clear();
+      hp2Fill.clear();
+      return;
+    }
 
     if (!currentFighters || !targetFighters) return;
 

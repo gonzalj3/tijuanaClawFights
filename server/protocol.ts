@@ -88,6 +88,7 @@ export type SpectatorMessage =
       hasNpc: boolean;
       hasMatch: boolean;
       queueSize: number;
+      waitingFighter: string | null;
     }
   | {
       type: "agent_msg";
