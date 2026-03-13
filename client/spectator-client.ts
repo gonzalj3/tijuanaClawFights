@@ -40,6 +40,7 @@ export type ArenaStatusMsg = {
   hasMatch: boolean;
   queueSize: number;
   waitingFighter: string | null;
+  npcType: "normal" | "stationary";
 };
 
 export type AgentRelayMsg = {

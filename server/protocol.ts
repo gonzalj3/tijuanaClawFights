@@ -90,6 +90,7 @@ export type SpectatorMessage =
       hasMatch: boolean;
       queueSize: number;
       waitingFighter: string | null;
+      npcType: NpcType;
     }
   | {
       type: "agent_msg";
@@ -113,9 +114,12 @@ export interface LeaderboardEntry {
 }
 
 // ─── Spectator → Server Messages ───────────────────────────────
+export type NpcType = "normal" | "stationary";
+
 export type SpectatorControlMessage =
   | { type: "spawn_npc" }
-  | { type: "dismiss_npc" };
+  | { type: "dismiss_npc" }
+  | { type: "set_npc_type"; npcType: NpcType };
 
 // ─── Combat Constants ──────────────────────────────────────────
 export const ARENA_WIDTH = 10;

@@ -103,6 +103,7 @@ const server = Bun.serve({
           hasMatch,
           queueSize: matchmaker.getQueueSize(),
           waitingFighter: matchmaker.getFirstWaitingName(),
+          npcType: engine.npcType,
         }));
         console.log("[Spectator] connected");
       }
@@ -122,6 +123,8 @@ const server = Bun.serve({
             engine.spawnNpc();
           } else if (msg.type === "dismiss_npc") {
             engine.dismissNpc();
+          } else if (msg.type === "set_npc_type") {
+            engine.setNpcType(msg.npcType);
           }
         } catch {}
       }

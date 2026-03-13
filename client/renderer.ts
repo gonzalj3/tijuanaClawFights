@@ -208,6 +208,16 @@ async function main() {
   // NPC dismiss button
   const dismissBtn = document.getElementById("dismiss-btn")! as HTMLButtonElement;
 
+  // NPC type toggle button
+  let npcTypeBtn = document.getElementById("npc-type-btn") as HTMLButtonElement | null;
+  if (!npcTypeBtn) {
+    npcTypeBtn = document.createElement("button");
+    npcTypeBtn.id = "npc-type-btn";
+    npcTypeBtn.textContent = "NPC: Stationary";
+    dismissBtn.parentElement!.appendChild(npcTypeBtn);
+  }
+  let currentNpcType: "normal" | "stationary" = "stationary";
+
   // Connect to server
   const conn = connectSpectator({
     onConnect() {
@@ -315,6 +325,8 @@ async function main() {
     },
     onArenaStatus(msg: ArenaStatusMsg) {
       dismissBtn.style.display = msg.hasNpc ? "" : "none";
+      currentNpcType = msg.npcType;
+      npcTypeBtn!.textContent = currentNpcType === "stationary" ? "NPC: Stationary" : "NPC: Normal";
       waitingFighterName = (!matchActive && msg.waitingFighter) ? msg.waitingFighter : null;
       if (waitingFighterName) {
         matchInfoText.text = `${waitingFighterName} waiting for challenger...`;
@@ -343,6 +355,11 @@ async function main() {
 
   dismissBtn.addEventListener("click", () => {
     conn.send({ type: "dismiss_npc" });
+  });
+
+  npcTypeBtn!.addEventListener("click", () => {
+    const newType = currentNpcType === "stationary" ? "normal" : "stationary";
+    conn.send({ type: "set_npc_type", npcType: newType });
   });
 
   function showAnnouncement(text: string, color: number) {

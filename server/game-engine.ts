@@ -1,10 +1,10 @@
 import { Match } from "./match.ts";
 import { TICK_MS } from "./protocol.ts";
-import { NpcBot } from "./npc-bot.ts";
+import { NpcBot, NpcStationaryBot } from "./npc-bot.ts";
 import { type Matchmaker, MAX_FIGHTS } from "./matchmaker.ts";
 import { loadStats, saveStats, cleanOldDays, getToday } from "./leaderboard-db.ts";
 import type { ServerWebSocket } from "bun";
-import type { SpectatorMessage, LeaderboardEntry } from "./protocol.ts";
+import type { SpectatorMessage, LeaderboardEntry, NpcType } from "./protocol.ts";
 
 export type AgentSocket = ServerWebSocket<{ agentId: string; matchId?: string; fighterIndex?: 0 | 1 }>;
 export type SpectatorSocket = ServerWebSocket<{ spectator: true }>;
@@ -29,9 +29,10 @@ export class GameEngine {
   lastStateSentAt = new Map<string, number>(); // agentId → timestamp (for anti-heuristic rate limiting)
   private tickInterval: ReturnType<typeof setInterval> | null = null;
   private agentStats = new Map<string, AgentStats>(); // agent name → stats
-  private npc: NpcBot | null = null;
+  private npc: NpcBot | NpcStationaryBot | null = null;
   private npcMatchId: string | null = null;
   private npcFighterIndex: 0 | 1 = 0;
+  npcType: NpcType = "stationary";
 
   start(): void {
     if (this.tickInterval) return;
@@ -309,7 +310,7 @@ export class GameEngine {
 
   spawnNpc(): void {
     if (this.npc) return; // already active
-    this.npc = new NpcBot();
+    this.npc = this.npcType === "stationary" ? new NpcStationaryBot() : new NpcBot();
     // Register NPC as a virtual agent (no real socket)
     console.log(`[NPC] Spawned: ${this.npc.name} (${this.npc.id})`);
     // Enqueue via matchmaker
@@ -368,6 +369,26 @@ export class GameEngine {
     return this.npc?.id ?? null;
   }
 
+  setNpcType(type: NpcType): void {
+    this.npcType = type;
+    console.log(`[NPC] Type set to: ${type}`);
+    // Dismiss current NPC and respawn with new type
+    if (this.npc) {
+      this.dismissNpc();
+      // Wait for dismiss to complete, then respawn
+      const waitAndRespawn = () => {
+        if (this.npc) {
+          // Still waiting for current NPC to finish match
+          setTimeout(waitAndRespawn, 1000);
+        } else {
+          this.spawnNpc();
+        }
+      };
+      setTimeout(waitAndRespawn, 100);
+    }
+    this.broadcastArenaStatus();
+  }
+
   broadcastArenaStatus(): void {
     const hasMatch = [...this.matches.values()].some((m) => !m.finished);
     this.broadcastToSpectators({
@@ -376,6 +397,7 @@ export class GameEngine {
       hasMatch,
       queueSize: this.matchmaker?.getQueueSize() ?? 0,
       waitingFighter: this.matchmaker?.getFirstWaitingName() ?? null,
+      npcType: this.npcType,
     });
   }
 }
