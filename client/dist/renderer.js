@@ -33786,6 +33786,10 @@ async function main() {
       agentHeaders[1].textContent = msg.fighters[1];
       agentLogs[0].innerHTML = "";
       agentLogs[1].innerHTML = "";
+      currentFighters = null;
+      targetFighters = null;
+      prevFighters = null;
+      interpProgress = 0;
       fighter1.setState("idle");
       fighter2.setState("idle");
       console.log(`Match started: ${msg.fighters[0]} vs ${msg.fighters[1]}`);
@@ -33904,7 +33908,7 @@ async function main() {
     }
     if (!currentFighters || !targetFighters)
       return;
-    interpProgress = Math.min(1, interpProgress + ticker.deltaTime / 12);
+    interpProgress = Math.min(1, interpProgress + ticker.deltaTime / 24);
     for (let i2 = 0;i2 < 2; i2++) {
       const curr = currentFighters[i2];
       const tgt = targetFighters[i2];

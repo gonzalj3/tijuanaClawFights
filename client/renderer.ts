@@ -225,6 +225,11 @@ async function main() {
       agentHeaders[1]!.textContent = msg.fighters[1];
       agentLogs[0]!.innerHTML = "";
       agentLogs[1]!.innerHTML = "";
+      // Clear interpolation state so we don't lerp from old match positions
+      currentFighters = null;
+      targetFighters = null;
+      prevFighters = null;
+      interpProgress = 0;
       // Reset fighter sprites to idle
       fighter1.setState("idle");
       fighter2.setState("idle");
@@ -378,8 +383,8 @@ async function main() {
 
     if (!currentFighters || !targetFighters) return;
 
-    // Interpolate (5 ticks/sec = 200ms, at 60fps ~ 12 frames per tick)
-    interpProgress = Math.min(1, interpProgress + ticker.deltaTime / 12);
+    // Interpolate (2.5 ticks/sec = 400ms, at 60fps ~ 24 frames per tick)
+    interpProgress = Math.min(1, interpProgress + ticker.deltaTime / 24);
 
     for (let i = 0; i < 2; i++) {
       const curr = currentFighters[i as 0 | 1];
