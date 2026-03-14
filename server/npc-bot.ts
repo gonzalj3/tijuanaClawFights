@@ -96,8 +96,8 @@ export class NpcStationaryBot {
   onTick(match: Match, fighterIndex: 0 | 1): void {
     if (match.finished) return;
 
-    // Skip ~70% of ticks to simulate slower reaction time
-    if (Math.random() < 0.7) return;
+    // Skip ~85% of ticks — slower than regular NPC since it doesn't move
+    if (Math.random() < 0.85) return;
 
     const me = match.fighters[fighterIndex];
     const opp = match.fighters[fighterIndex === 0 ? 1 : 0];

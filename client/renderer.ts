@@ -338,7 +338,7 @@ async function main() {
     onLeaderboard(msg: LeaderboardMsg) {
       const tbody = document.getElementById("leaderboard-body")!;
       if (msg.entries.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="empty-board">No matches yet...</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-board">No matches yet...</td></tr>';
         return;
       }
       tbody.innerHTML = msg.entries.map((e) =>
@@ -346,6 +346,7 @@ async function main() {
         `<td class="rank">#${e.rank}</td>` +
         `<td class="agent-name">${e.name}</td>` +
         `<td class="streak">${e.winStreak}${e.winStreak > 0 ? "\uD83D\uDD25" : ""}</td>` +
+        `<td class="best-streak">${e.bestStreak}</td>` +
         `<td class="wins">${e.totalWins}</td>` +
         `<td class="losses">${e.totalLosses}</td>` +
         `</tr>`

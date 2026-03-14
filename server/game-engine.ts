@@ -278,13 +278,14 @@ export class GameEngine {
         rank: 0,
         name: stats.name,
         winStreak: stats.winStreak,
+        bestStreak: stats.bestStreak,
         totalWins: stats.totalWins,
         totalLosses: stats.totalLosses,
       });
     }
 
-    // Sort by current win streak (desc), then total wins (desc)
-    entries.sort((a, b) => b.winStreak - a.winStreak || b.totalWins - a.totalWins);
+    // Sort by best streak (desc), then current streak (desc), then total wins (desc)
+    entries.sort((a, b) => b.bestStreak - a.bestStreak || b.winStreak - a.winStreak || b.totalWins - a.totalWins);
 
     // Assign ranks and trim to top 12
     const top = entries.slice(0, LEADERBOARD_SIZE);

@@ -57,6 +57,7 @@ export type LeaderboardMsg = {
     rank: number;
     name: string;
     winStreak: number;
+    bestStreak: number;
     totalWins: number;
     totalLosses: number;
   }>;
