@@ -30294,6 +30294,58 @@ var init_BitmapFont = __esm(() => {
   };
 });
 
+// client/spectator-client.ts
+function connectSpectator(callbacks) {
+  const proto = location.protocol === "https:" ? "wss:" : "ws:";
+  const url = `${proto}//${location.host}/spectate`;
+  let ws;
+  let reconnectTimer;
+  const connection = {
+    send(msg) {
+      if (ws?.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(msg));
+      }
+    }
+  };
+  function connect() {
+    ws = new WebSocket(url);
+    ws.onopen = () => {
+      console.log("[Spectator] Connected");
+      callbacks.onConnect();
+    };
+    ws.onmessage = (ev) => {
+      const msg = JSON.parse(ev.data);
+      switch (msg.type) {
+        case "match_state":
+          callbacks.onMatchState(msg);
+          break;
+        case "match_start":
+          callbacks.onMatchStart(msg);
+          break;
+        case "match_end":
+          callbacks.onMatchEnd(msg);
+          break;
+        case "arena_status":
+          callbacks.onArenaStatus(msg);
+          break;
+        case "agent_msg":
+          callbacks.onAgentMsg(msg);
+          break;
+        case "leaderboard":
+          callbacks.onLeaderboard(msg);
+          break;
+      }
+    };
+    ws.onclose = () => {
+      console.log("[Spectator] Disconnected, reconnecting...");
+      callbacks.onDisconnect();
+      reconnectTimer = window.setTimeout(connect, 2000);
+    };
+  }
+  connect();
+  return connection;
+}
+
 // node_modules/pixi.js/lib/environment-browser/browserExt.mjs
 init_Extensions();
 var browserExt = {
@@ -33291,58 +33343,6 @@ init_TextStyle();
 init_eventemitter3();
 extensions.add(browserExt, webworkerExt);
 
-// client/spectator-client.ts
-function connectSpectator(callbacks) {
-  const proto = location.protocol === "https:" ? "wss:" : "ws:";
-  const url = `${proto}//${location.host}/spectate`;
-  let ws;
-  let reconnectTimer;
-  const connection = {
-    send(msg) {
-      if (ws?.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify(msg));
-      }
-    }
-  };
-  function connect() {
-    ws = new WebSocket(url);
-    ws.onopen = () => {
-      console.log("[Spectator] Connected");
-      callbacks.onConnect();
-    };
-    ws.onmessage = (ev) => {
-      const msg = JSON.parse(ev.data);
-      switch (msg.type) {
-        case "match_state":
-          callbacks.onMatchState(msg);
-          break;
-        case "match_start":
-          callbacks.onMatchStart(msg);
-          break;
-        case "match_end":
-          callbacks.onMatchEnd(msg);
-          break;
-        case "arena_status":
-          callbacks.onArenaStatus(msg);
-          break;
-        case "agent_msg":
-          callbacks.onAgentMsg(msg);
-          break;
-        case "leaderboard":
-          callbacks.onLeaderboard(msg);
-          break;
-      }
-    };
-    ws.onclose = () => {
-      console.log("[Spectator] Disconnected, reconnecting...");
-      callbacks.onDisconnect();
-      reconnectTimer = window.setTimeout(connect, 2000);
-    };
-  }
-  connect();
-  return connection;
-}
-
 // client/sprites.ts
 function actionToAnim(action, wasHit, isKo) {
   if (isKo)
@@ -33882,7 +33882,7 @@ async function main() {
         tbody.innerHTML = '<tr><td colspan="6" class="empty-board">No matches yet...</td></tr>';
         return;
       }
-      tbody.innerHTML = msg.entries.map((e2) => `<tr class="rank-${e2.rank}">` + `<td class="rank">#${e2.rank}</td>` + `<td class="agent-name">${e2.name}</td>` + `<td class="streak">${e2.winStreak}${e2.winStreak > 0 ? "\uD83D\uDD25" : ""}</td>` + `<td class="best-streak">${e2.bestStreak}</td>` + `<td class="wins">${e2.totalWins}</td>` + `<td class="losses">${e2.totalLosses}</td>` + `</tr>`).join("");
+      tbody.innerHTML = msg.entries.map((e2) => `<tr class="rank-${e2.rank}">` + `<td class="rank">#${e2.rank}</td>` + `<td class="agent-name">${e2.name}</td>` + `<td class="streak">${e2.bestStreak}${e2.bestStreak > 0 ? "\uD83D\uDD25" : ""}</td>` + `<td class="wins">${e2.totalWins}</td>` + `<td class="losses">${e2.totalLosses}</td>` + `</tr>`).join("");
     }
   });
   dismissBtn.addEventListener("click", () => {

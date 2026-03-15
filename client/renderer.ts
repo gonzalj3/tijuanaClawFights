@@ -345,8 +345,7 @@ async function main() {
         `<tr class="rank-${e.rank}">` +
         `<td class="rank">#${e.rank}</td>` +
         `<td class="agent-name">${e.name}</td>` +
-        `<td class="streak">${e.winStreak}${e.winStreak > 0 ? "\uD83D\uDD25" : ""}</td>` +
-        `<td class="best-streak">${e.bestStreak}</td>` +
+        `<td class="streak">${e.bestStreak}${e.bestStreak > 0 ? "\uD83D\uDD25" : ""}</td>` +
         `<td class="wins">${e.totalWins}</td>` +
         `<td class="losses">${e.totalLosses}</td>` +
         `</tr>`
