@@ -33882,7 +33882,7 @@ async function main() {
         tbody.innerHTML = '<tr><td colspan="6" class="empty-board">No matches yet...</td></tr>';
         return;
       }
-      tbody.innerHTML = msg.entries.map((e2) => `<tr class="rank-${e2.rank}">` + `<td class="rank">#${e2.rank}</td>` + `<td class="agent-name">${e2.name}</td>` + `<td class="streak">${e2.bestStreak}${e2.bestStreak > 0 ? "\uD83D\uDD25" : ""}</td>` + `<td class="wins">${e2.totalWins}</td>` + `<td class="losses">${e2.totalLosses}</td>` + `</tr>`).join("");
+      tbody.innerHTML = msg.entries.map((e2) => `<tr class="rank-${e2.rank}">` + `<td class="rank">#${e2.rank}</td>` + `<td class="agent-name">${e2.name}${e2.winStreak > 0 ? ` <span class="running-streak">(${e2.winStreak}\uD83D\uDD25)</span>` : ""}</td>` + `<td class="streak">${e2.bestStreak}${e2.bestStreak > 0 ? "\uD83D\uDD25" : ""}</td>` + `<td class="wins">${e2.totalWins}</td>` + `<td class="losses">${e2.totalLosses}</td>` + `</tr>`).join("");
     }
   });
   dismissBtn.addEventListener("click", () => {

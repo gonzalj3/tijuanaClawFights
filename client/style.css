@@ -116,6 +116,11 @@ h1 {
   color: #4488ff;
   font-weight: bold;
 }
+#leaderboard-table .running-streak {
+  color: #ffcc00;
+  font-weight: normal;
+  font-size: 0.75em;
+}
 #leaderboard-table .streak {
   color: #ff4444;
   font-weight: bold;
