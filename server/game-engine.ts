@@ -72,8 +72,14 @@ export class GameEngine {
     match.onEnd = (m) => {
       const endMsg = m.getEndMessage();
 
-      // Record stats
-      this.recordMatchResult(name0, name1, endMsg.winner);
+      // Record stats (skip demo fights — don't pollute leaderboard)
+      const npcId = this.npc?.id;
+      const npc2Id = this.npc2?.id;
+      const isDemoFight = (agent0Id === npcId || agent0Id === npc2Id) &&
+                          (agent1Id === npcId || agent1Id === npc2Id);
+      if (!isDemoFight) {
+        this.recordMatchResult(name0, name1, endMsg.winner);
+      }
 
       // Notify agents
       const sock0 = this.agentSockets.get(agent0Id);
