@@ -31,6 +31,7 @@ let prevFighters: [FighterState, FighterState] | null = null;
 let interpProgress = 0;
 let activeEvents: Array<{ text: string; x: number; y: number; age: number; type: string }> = [];
 let matchActive = false;
+let activeMatchId: string | null = null;
 let statusEl: HTMLElement;
 let timerText: Text;
 let matchInfoText: Text;
@@ -228,6 +229,7 @@ async function main() {
     },
     onMatchStart(msg: MatchStartMsg) {
       matchActive = true;
+      activeMatchId = msg.matchId;
       waitingFighterName = null;
       matchInfoText.text = "";
       showAnnouncement("FIGHT!", 0xffcc00);
@@ -246,8 +248,12 @@ async function main() {
       console.log(`Match started: ${msg.fighters[0]} vs ${msg.fighters[1]}`);
     },
     onMatchState(msg: MatchStateMsg) {
+      // Only render the match we're actively watching
+      if (activeMatchId && msg.matchId !== activeMatchId) return;
+
       if (!matchActive) {
         matchActive = true;
+        activeMatchId = msg.matchId;
         matchInfoText.text = "";
       }
 
@@ -314,7 +320,9 @@ async function main() {
       timerText.text = `${Math.ceil(msg.timeRemaining / 5)}s`;
     },
     onMatchEnd(msg: MatchEndMsg) {
+      if (activeMatchId && msg.matchId !== activeMatchId) return;
       matchActive = false;
+      activeMatchId = null;
       const resultText = msg.winner
         ? `${msg.winner} WINS!`
         : "DRAW!";
