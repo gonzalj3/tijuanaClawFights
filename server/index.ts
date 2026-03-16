@@ -28,6 +28,7 @@ function serveStatic(path: string): Response {
       jpg: "image/jpeg",
       jpeg: "image/jpeg",
       webp: "image/webp",
+      txt: "text/plain; charset=utf-8",
     };
     return new Response(file, {
       headers: { "Content-Type": contentType[ext] ?? "application/octet-stream" },
@@ -67,9 +68,19 @@ const server = Bun.serve({
       return Response.json(msg.matches ?? []);
     }
 
-    // Static files
+    // Landing page
     if (url.pathname === "/" || url.pathname === "/index.html") {
-      return serveStatic("index.html");
+      return serveStatic("landing.html");
+    }
+
+    // Arena (spectator view)
+    if (url.pathname === "/arena") {
+      return serveStatic("arena.html");
+    }
+
+    // llms.txt for AI agent discoverability
+    if (url.pathname === "/llms.txt") {
+      return serveStatic("llms.txt");
     }
     if (url.pathname.startsWith("/dist/")) {
       return serveStatic(url.pathname.slice(1));
