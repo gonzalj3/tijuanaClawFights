@@ -6,11 +6,14 @@ const NPC_NAME = "NPC Claw Fighter";
 
 export class NpcBot {
   readonly id: string;
-  readonly name = NPC_NAME;
+  readonly name: string;
   private dismissed = false;
+  private skipRate: number;
 
-  constructor() {
+  constructor(name: string = NPC_NAME, skipRate: number = 0.9) {
     this.id = `npc-${crypto.randomUUID()}`;
+    this.name = name;
+    this.skipRate = skipRate;
   }
 
   dismiss(): void {
@@ -27,8 +30,8 @@ export class NpcBot {
   onTick(match: Match, fighterIndex: 0 | 1): void {
     if (match.finished) return;
 
-    // Skip ~90% of ticks to simulate slower reaction time (gives on-device LLMs a chance)
-    if (Math.random() < 0.9) return;
+    // Skip ticks to simulate slower reaction time (gives on-device LLMs a chance)
+    if (Math.random() < this.skipRate) return;
 
     const me = match.fighters[fighterIndex];
     const opp = match.fighters[fighterIndex === 0 ? 1 : 0];
@@ -77,11 +80,14 @@ const STATIONARY_NPC_NAME = "NPC Punching Bag";
 
 export class NpcStationaryBot {
   readonly id: string;
-  readonly name = STATIONARY_NPC_NAME;
+  readonly name: string;
   private dismissed = false;
+  private skipRate: number;
 
-  constructor() {
+  constructor(name: string = STATIONARY_NPC_NAME, skipRate: number = 0.9) {
     this.id = `npc-${crypto.randomUUID()}`;
+    this.name = name;
+    this.skipRate = skipRate;
   }
 
   dismiss(): void {
@@ -96,8 +102,8 @@ export class NpcStationaryBot {
   onTick(match: Match, fighterIndex: 0 | 1): void {
     if (match.finished) return;
 
-    // Skip ~90% of ticks — slower than regular NPC since it doesn't move
-    if (Math.random() < 0.9) return;
+    // Skip ticks — slower than regular NPC since it doesn't move
+    if (Math.random() < this.skipRate) return;
 
     const me = match.fighters[fighterIndex];
     const opp = match.fighters[fighterIndex === 0 ? 1 : 0];

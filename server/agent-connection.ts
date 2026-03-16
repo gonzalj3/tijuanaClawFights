@@ -47,6 +47,8 @@ export function handleAgentMessage(
       agents.set(id, msg.name);
       ws.data.agentId = id;
       engine.agentSockets.set(id, ws as any);
+      // Cancel demo timer early — a real agent is connecting
+      engine.exitDemoMode();
       ws.send(JSON.stringify({ type: "registered", id }));
       console.log(`[Agent] ${msg.name} registered (${id})`);
       break;
@@ -58,6 +60,8 @@ export function handleAgentMessage(
         ws.send(JSON.stringify({ type: "error", message: "Not registered" }));
         return;
       }
+      // Exit demo mode so the arena is free for real agents
+      engine.exitDemoMode();
       ws.send(JSON.stringify({ type: "queued" }));
       matchmaker.enqueue(ws.data.agentId, name);
       break;

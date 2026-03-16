@@ -20,6 +20,7 @@ interface AgentStats {
 }
 
 const LEADERBOARD_SIZE = 12;
+const DEMO_WAIT_MS = 5 * 60 * 1000; // 5 minutes before demo mode activates
 
 export class GameEngine {
   matches = new Map<string, Match>();
@@ -34,6 +35,13 @@ export class GameEngine {
   private npcFighterIndex: 0 | 1 = 0;
   npcType: NpcType = "stationary";
 
+  // Demo mode state
+  private npc2: NpcBot | null = null;
+  private npc2MatchId: string | null = null;
+  private npc2FighterIndex: 0 | 1 = 1;
+  private demoTimer: ReturnType<typeof setTimeout> | null = null;
+  private demoMode = false;
+
   start(): void {
     if (this.tickInterval) return;
 
@@ -47,6 +55,8 @@ export class GameEngine {
     console.log(`Game engine started (${TICK_MS}ms ticks)`);
     // Auto-spawn NPC so the arena is never empty
     this.spawnNpc();
+    // Start demo timer (will fire if no agents connect within 5 min)
+    this.startDemoTimer();
   }
 
   stop(): void {
@@ -105,16 +115,39 @@ export class GameEngine {
         }
       }
 
-      // Auto re-queue or kick agents via matchmaker (skip NPC — handled above)
+      // Handle NPC2 (demo mode) match end
+      if (this.npc2MatchId === id) {
+        this.npc2MatchId = null;
+        if (this.npc2) {
+          if (this.npc2.isDismissed) {
+            this.destroyNpc2();
+          } else if (this.demoMode) {
+            // Re-queue npc2 for continuous demo fights
+            const npc2Ref = this.npc2;
+            setTimeout(() => {
+              if (npc2Ref && !npc2Ref.isDismissed && this.demoMode) {
+                this.matchmaker?.enqueue(npc2Ref.id, npc2Ref.name);
+              }
+            }, 5000);
+          }
+        }
+      }
+
+      // Auto re-queue or kick agents via matchmaker (skip NPCs — handled above)
       if (this.matchmaker) {
         const npcId = this.npc?.id;
-        if (agent0Id !== npcId && agent1Id !== npcId) {
+        const npc2Id = this.npc2?.id;
+        const isNpc0 = agent0Id === npcId || agent0Id === npc2Id;
+        const isNpc1 = agent1Id === npcId || agent1Id === npc2Id;
+
+        if (!isNpc0 && !isNpc1) {
           this.matchmaker.onMatchEnd(agent0Id, name0, agent1Id, name1);
+        } else if (isNpc0 && isNpc1) {
+          // Both NPCs — demo match, no real agents to handle
         } else {
           // Only handle the non-NPC agent
-          const realId = agent0Id === npcId ? agent1Id : agent0Id;
-          const realName = agent0Id === npcId ? name1 : name0;
-          // Use single-agent handler (respects noAutoRequeue flag)
+          const realId = isNpc0 ? agent1Id : agent0Id;
+          const realName = isNpc0 ? name1 : name0;
           this.matchmaker.onSingleAgentMatchEnd(realId, realName);
         }
       }
@@ -147,6 +180,11 @@ export class GameEngine {
       if (agent0Id === this.npc.id) this.setNpcMatch(id, 0);
       else if (agent1Id === this.npc.id) this.setNpcMatch(id, 1);
     }
+    // Track NPC2 (demo mode) match
+    if (this.npc2) {
+      if (agent0Id === this.npc2.id) { this.npc2MatchId = id; this.npc2FighterIndex = 0; }
+      else if (agent1Id === this.npc2.id) { this.npc2MatchId = id; this.npc2FighterIndex = 1; }
+    }
 
     // Notify spectators of new match
     this.broadcastToSpectators({
@@ -169,7 +207,6 @@ export class GameEngine {
       // NPC tick — feed game state to the bot
       if (this.npc && this.npcMatchId === matchId) {
         const npcState = match.getAgentState(this.npcFighterIndex);
-        // Relay outgoing state to spectators (like real agents)
         this.broadcastToSpectators({
           type: "agent_msg",
           fighter: this.npcFighterIndex,
@@ -180,7 +217,6 @@ export class GameEngine {
 
         this.npc.onTick(match, this.npcFighterIndex);
 
-        // Relay NPC's chosen action to spectators (like real agents' incoming messages)
         const npcAction = match.fighters[this.npcFighterIndex].pendingAction;
         if (npcAction) {
           this.broadcastToSpectators({
@@ -189,6 +225,31 @@ export class GameEngine {
             name: match.fighters[this.npcFighterIndex].name,
             direction: "in",
             msg: { type: "action", action: npcAction },
+          });
+        }
+      }
+
+      // NPC2 tick (demo mode)
+      if (this.npc2 && this.npc2MatchId === matchId) {
+        const npc2State = match.getAgentState(this.npc2FighterIndex);
+        this.broadcastToSpectators({
+          type: "agent_msg",
+          fighter: this.npc2FighterIndex,
+          name: match.fighters[this.npc2FighterIndex].name,
+          direction: "out",
+          msg: npc2State,
+        });
+
+        this.npc2.onTick(match, this.npc2FighterIndex);
+
+        const npc2Action = match.fighters[this.npc2FighterIndex].pendingAction;
+        if (npc2Action) {
+          this.broadcastToSpectators({
+            type: "agent_msg",
+            fighter: this.npc2FighterIndex,
+            name: match.fighters[this.npc2FighterIndex].name,
+            direction: "in",
+            msg: { type: "action", action: npc2Action },
           });
         }
       }
@@ -352,8 +413,99 @@ export class GameEngine {
       if (this.agentSockets.size === 0) {
         console.log(`[NPC] No agents connected, respawning`);
         this.spawnNpc();
+        this.startDemoTimer();
       }
     }, 3000);
+  }
+
+  // ─── Demo Mode ──────────────────────────────────────────────
+
+  startDemoTimer(): void {
+    this.cancelDemoTimer();
+    console.log(`[Demo] Timer started — demo mode in ${DEMO_WAIT_MS / 1000}s if no agents connect`);
+    this.demoTimer = setTimeout(() => {
+      this.demoTimer = null;
+      if (this.agentSockets.size === 0) {
+        this.enterDemoMode();
+      }
+    }, DEMO_WAIT_MS);
+  }
+
+  private cancelDemoTimer(): void {
+    if (this.demoTimer) {
+      clearTimeout(this.demoTimer);
+      this.demoTimer = null;
+    }
+  }
+
+  private enterDemoMode(): void {
+    if (this.demoMode) return;
+    this.demoMode = true;
+    console.log(`[Demo] Entering demo mode — spawning NPC Challenger`);
+
+    // Spawn npc2 as a moving NPC with 50% skip rate for more action
+    this.npc2 = new NpcBot("NPC Challenger", 0.5);
+    console.log(`[Demo] Spawned: ${this.npc2.name} (${this.npc2.id})`);
+
+    // Also make the primary NPC more active for demo fights
+    // Dismiss and respawn with lower skip rate
+    if (this.npc && !this.npcMatchId) {
+      this.matchmaker?.dequeue(this.npc.id);
+      this.npc.destroy();
+      this.npc = new NpcBot("NPC Claw Fighter", 0.5);
+      console.log(`[Demo] Respawned primary NPC with demo skip rate (${this.npc.id})`);
+      this.matchmaker?.enqueue(this.npc.id, this.npc.name);
+    }
+
+    // Enqueue npc2 — matchmaker will pair them
+    this.matchmaker?.enqueue(this.npc2.id, this.npc2.name);
+    this.broadcastArenaStatus();
+  }
+
+  exitDemoMode(): void {
+    if (!this.demoMode && !this.demoTimer) return;
+
+    this.cancelDemoTimer();
+
+    if (!this.demoMode) return; // only timer was pending, already cancelled
+
+    console.log(`[Demo] Exiting demo mode — real agent joined`);
+    this.demoMode = false;
+
+    // Forfeit demo match if one is active
+    if (this.npc2MatchId) {
+      const match = this.matches.get(this.npc2MatchId);
+      if (match && !match.finished) {
+        console.log(`[Demo] Forfeiting demo match ${this.npc2MatchId}`);
+        match.forfeit(this.npc2FighterIndex);
+      }
+    }
+
+    // Dismiss npc2
+    if (this.npc2) {
+      this.matchmaker?.dequeue(this.npc2.id);
+      this.destroyNpc2();
+    }
+
+    // Respawn primary NPC with normal skip rate if needed
+    if (this.npc && !this.npcMatchId) {
+      this.matchmaker?.dequeue(this.npc.id);
+      this.npc.destroy();
+      this.npc = this.npcType === "stationary" ? new NpcStationaryBot() : new NpcBot();
+      console.log(`[Demo] Respawned primary NPC with normal skip rate (${this.npc.id})`);
+      this.matchmaker?.enqueue(this.npc.id, this.npc.name);
+    }
+
+    this.broadcastArenaStatus();
+  }
+
+  private destroyNpc2(): void {
+    if (!this.npc2) return;
+    this.npc2.destroy();
+    this.matchmaker?.dequeue(this.npc2.id);
+    console.log(`[Demo] NPC2 removed`);
+    this.npc2 = null;
+    this.npc2MatchId = null;
   }
 
   /** Track which match the NPC is in (called from createMatch) */
