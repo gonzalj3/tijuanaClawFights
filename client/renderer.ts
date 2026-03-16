@@ -253,12 +253,17 @@ async function main() {
 
       prevFighters = currentFighters;
 
-      // Interpolation: store target, lerp from current
-      if (!currentFighters) {
+      // Interpolation: capture current visual position to avoid snapping
+      if (!currentFighters || !targetFighters) {
         currentFighters = msg.fighters;
         targetFighters = msg.fighters;
       } else {
-        currentFighters = targetFighters ?? msg.fighters;
+        // Compute where fighters visually are right now (mid-interpolation)
+        const visualFighters: [FighterState, FighterState] = [
+          { ...currentFighters[0], x: currentFighters[0].x + (targetFighters[0].x - currentFighters[0].x) * interpProgress },
+          { ...currentFighters[1], x: currentFighters[1].x + (targetFighters[1].x - currentFighters[1].x) * interpProgress },
+        ];
+        currentFighters = visualFighters;
         targetFighters = msg.fighters;
       }
       interpProgress = 0;

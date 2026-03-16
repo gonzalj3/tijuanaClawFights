@@ -33808,11 +33808,15 @@ async function main() {
         matchInfoText.text = "";
       }
       prevFighters = currentFighters;
-      if (!currentFighters) {
+      if (!currentFighters || !targetFighters) {
         currentFighters = msg.fighters;
         targetFighters = msg.fighters;
       } else {
-        currentFighters = targetFighters ?? msg.fighters;
+        const visualFighters = [
+          { ...currentFighters[0], x: currentFighters[0].x + (targetFighters[0].x - currentFighters[0].x) * interpProgress },
+          { ...currentFighters[1], x: currentFighters[1].x + (targetFighters[1].x - currentFighters[1].x) * interpProgress }
+        ];
+        currentFighters = visualFighters;
         targetFighters = msg.fighters;
       }
       interpProgress = 0;
