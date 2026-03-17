@@ -412,14 +412,18 @@ export class GameEngine {
     this.checkNpcRespawn();
   }
 
-  /** Re-spawn NPC if no real agents remain */
+  /** Re-spawn NPC if no real agents remain, and restart demo timer */
   checkNpcRespawn(): void {
     setTimeout(() => {
-      if (this.npc) return; // already respawned
       if (this.agentSockets.size === 0) {
-        console.log(`[NPC] No agents connected, respawning`);
-        this.spawnNpc();
-        this.startDemoTimer();
+        if (!this.npc) {
+          console.log(`[NPC] No agents connected, respawning`);
+          this.spawnNpc();
+        }
+        // Always restart demo timer when arena has no real agents
+        if (!this.demoMode) {
+          this.startDemoTimer();
+        }
       }
     }, 3000);
   }
