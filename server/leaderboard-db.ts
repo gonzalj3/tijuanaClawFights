@@ -40,7 +40,7 @@ const upsertStmt = db.prepare(`
 `);
 
 const loadStmt = db.prepare(`SELECT * FROM agent_stats WHERE day = ?`);
-const cleanStmt = db.prepare(`DELETE FROM agent_stats WHERE day != ?`);
+const cleanStmt = db.prepare(`DELETE FROM agent_stats WHERE day < ?`);
 
 export function getToday(): string {
   return new Date().toISOString().slice(0, 10);
@@ -81,9 +81,11 @@ export function saveStats(name: string, stats: AgentStats, today: string): void 
   });
 }
 
-export function cleanOldDays(today: string): void {
-  const result = cleanStmt.run(today);
+export function cleanOldDays(_today: string): void {
+  // Keep 7 days of history so deploys/restarts don't wipe today's data
+  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const result = cleanStmt.run(cutoff);
   if (result.changes > 0) {
-    console.log(`[Leaderboard] Cleaned ${result.changes} stale rows from previous days`);
+    console.log(`[Leaderboard] Cleaned ${result.changes} stale rows older than ${cutoff}`);
   }
 }
