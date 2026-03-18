@@ -45,6 +45,10 @@ export class Matchmaker {
     return this.queue.length > 0 ? this.queue[0]!.name : null;
   }
 
+  isInQueue(agentId: string): boolean {
+    return this.queue.some((a) => a.id === agentId);
+  }
+
   /** Called by game engine when a match ends. Handles re-queue or kick. */
   onMatchEnd(agent0Id: string, agent0Name: string, agent1Id: string, agent1Name: string): void {
     for (const [id, name] of [[agent0Id, agent0Name], [agent1Id, agent1Name]] as const) {
@@ -108,8 +112,9 @@ export class Matchmaker {
       sock.send(JSON.stringify({ type: "kicked", reason: `${MAX_FIGHTS} rounds completed` }));
       this.fightCounts.delete(agentId);
     } else {
-      // Auto re-queue after delay so spectators can see results
-      setTimeout(() => this.enqueue(agentId, agentName), REMATCH_DELAY_MS);
+      // If another agent is already waiting, re-queue quickly so they can fight
+      const delay = this.queue.length > 0 ? 1000 : REMATCH_DELAY_MS;
+      setTimeout(() => this.enqueue(agentId, agentName), delay);
     }
   }
 

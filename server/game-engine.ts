@@ -110,13 +110,22 @@ export class GameEngine {
             // NPC was told to leave — clean up
             this.destroyNpc();
           } else {
-            // Re-queue NPC for next match (delayed to match agent rematch delay)
-            const npcRef = this.npc;
-            setTimeout(() => {
-              if (npcRef && !npcRef.isDismissed) {
-                this.matchmaker?.enqueue(npcRef.id, npcRef.name);
-              }
-            }, 5000);
+            // If a real agent is already waiting in queue, don't re-queue NPC —
+            // let the two real agents fight each other instead.
+            const realAgentsWaiting = this.matchmaker
+              ? this.matchmaker.getQueueSize() > 0
+              : false;
+            if (realAgentsWaiting) {
+              console.log(`[NPC] Stepping aside — real agent waiting in queue`);
+            } else {
+              // No one waiting — re-queue NPC for next match
+              const npcRef = this.npc;
+              setTimeout(() => {
+                if (npcRef && !npcRef.isDismissed) {
+                  this.matchmaker?.enqueue(npcRef.id, npcRef.name);
+                }
+              }, 5000);
+            }
           }
         }
       }
@@ -423,6 +432,18 @@ export class GameEngine {
         // Always restart demo timer when arena has no real agents
         if (!this.demoMode) {
           this.startDemoTimer();
+        }
+      } else if (this.npc && !this.npcMatchId && !this.npc.isDismissed) {
+        // NPC exists but isn't queued or in a match (stepped aside earlier).
+        // If an agent is alone in queue with no one to fight, re-queue the NPC.
+        const queueSize = this.matchmaker?.getQueueSize() ?? 0;
+        const activeMatches = [...this.matches.values()].filter(m => !m.finished).length;
+        if (queueSize === 1 && activeMatches === 0) {
+          const npcInQueue = this.matchmaker!.isInQueue(this.npc.id);
+          if (!npcInQueue) {
+            console.log(`[NPC] Re-queuing — lone agent waiting with no match`);
+            this.matchmaker?.enqueue(this.npc.id, this.npc.name);
+          }
         }
       }
     }, 3000);
