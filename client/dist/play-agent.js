@@ -20591,6 +20591,19 @@ var recordEl = document.getElementById("record");
 var matchInfoEl = document.getElementById("match-info");
 var webgpuError = document.getElementById("webgpu-error");
 var mainContent = document.getElementById("main-content");
+var agentLog = document.getElementById("agent-log");
+var tickDisplay = document.getElementById("tick-display");
+var MAX_LOG_ENTRIES = 150;
+function log2(cls, text) {
+  const el = document.createElement("div");
+  el.className = cls;
+  el.textContent = text;
+  agentLog.appendChild(el);
+  while (agentLog.children.length > MAX_LOG_ENTRIES) {
+    agentLog.removeChild(agentLog.firstChild);
+  }
+  agentLog.scrollTop = agentLog.scrollHeight;
+}
 var ws = null;
 var modelReady = false;
 var inferring = false;
@@ -20659,6 +20672,7 @@ function connectAgent() {
         matchInfoEl.textContent = `Fighting: ${msg.opponent}`;
         lastStateTick = -1;
         inferring = false;
+        log2("log-info", `── Match started vs ${msg.opponent} ──`);
         break;
       case "game_state":
         onGameState(msg);
@@ -20684,8 +20698,13 @@ function connectAgent() {
   };
 }
 function onGameState(msg) {
-  if (inferring)
+  const dist = Math.abs(msg.you.x - msg.opponent.x);
+  tickDisplay.textContent = `T${msg.tick}  ${Math.ceil(msg.timeRemaining)}s`;
+  if (inferring) {
+    log2("log-skip", `T${msg.tick} ⏭ skipped (LLM still thinking)`);
     return;
+  }
+  log2("log-state", `T${msg.tick} ← state: hp=${msg.you.hp}/${msg.opponent.hp} dist=${dist} opp=${msg.opponent.lastAction ?? "-"}`);
   lastStateTick = msg.tick;
   inferring = true;
   const stateReceivedAt = Date.now();
@@ -20696,12 +20715,14 @@ function onGameState(msg) {
     timeRemaining: msg.timeRemaining
   };
   pickAction(state).then((action) => {
+    const elapsed = Date.now() - stateReceivedAt;
     inferring = false;
-    if (!action)
+    if (!action) {
+      log2("log-error", `T${msg.tick} ✗ no valid action (${elapsed}ms)`);
       return;
+    }
     if (!ws || ws.readyState !== WebSocket.OPEN)
       return;
-    const elapsed = Date.now() - stateReceivedAt;
     const delay = Math.max(0, MIN_RESPONSE_MS - elapsed);
     const send = () => {
       if (ws && ws.readyState === WebSocket.OPEN) {
@@ -20710,6 +20731,7 @@ function onGameState(msg) {
           tick: lastStateTick,
           action
         }));
+        log2("log-action", `T${msg.tick} → ${action} (${elapsed}ms inference${delay > 0 ? `, +${delay}ms delay` : ""})`);
       }
     };
     if (delay > 0) {
@@ -20724,12 +20746,15 @@ function onMatchEnd(msg) {
   if (msg.winner === null) {
     draws++;
     statusEl.textContent = "Draw!";
+    log2("log-info", `── Draw! ──`);
   } else if (msg.winner === name) {
     wins++;
     statusEl.textContent = `You won! (${msg.reason})`;
+    log2("log-info", `── You won! (${msg.reason}) ──`);
   } else {
     losses++;
     statusEl.textContent = `You lost to ${msg.winner}. (${msg.reason})`;
+    log2("log-error", `── Lost to ${msg.winner} (${msg.reason}) ──`);
   }
   matchInfoEl.textContent = "";
   recordEl.textContent = `W: ${wins}  L: ${losses}  D: ${draws}`;
