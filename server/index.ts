@@ -30,9 +30,14 @@ function serveStatic(path: string): Response {
       webp: "image/webp",
       txt: "text/plain; charset=utf-8",
     };
-    return new Response(file, {
-      headers: { "Content-Type": contentType[ext] ?? "application/octet-stream" },
-    });
+    const headers: Record<string, string> = {
+      "Content-Type": contentType[ext] ?? "application/octet-stream",
+    };
+    // Prevent caching for HTML and JS so deploys take effect immediately
+    if (ext === "html" || ext === "js") {
+      headers["Cache-Control"] = "no-cache";
+    }
+    return new Response(file, { headers });
   } catch {
     return new Response("Not found", { status: 404 });
   }
