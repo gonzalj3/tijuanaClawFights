@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "bun run --watch server/index.ts",
-    "build": "bun build client/renderer.ts client/spectator-client.ts --outdir=client/dist --target=browser",
+    "build": "bun build client/renderer.ts client/spectator-client.ts client/play-agent.ts --outdir=client/dist --target=browser",
     "agent": "bun run test-agent/agent.ts"
   },
   "devDependencies": {
@@ -15,6 +15,7 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@mlc-ai/web-llm": "^0.2.82",
     "pixi.js": "^8"
   }
 }

@@ -2,6 +2,7 @@ var __create = Object.create;
 var __getProtoOf = Object.getPrototypeOf;
 var __defProp = Object.defineProperty;
 var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
 function __accessProp(key) {
   return this[key];
@@ -28,6 +29,23 @@ var __toESM = (mod, isNodeMode, target) => {
     cache.set(mod, to);
   return to;
 };
+var __toCommonJS = (from) => {
+  var entry = (__moduleCache ??= new WeakMap).get(from), desc;
+  if (entry)
+    return entry;
+  entry = __defProp({}, "__esModule", { value: true });
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (var key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(entry, key))
+        __defProp(entry, key, {
+          get: __accessProp.bind(from, key),
+          enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable
+        });
+  }
+  __moduleCache.set(from, entry);
+  return entry;
+};
+var __moduleCache;
 var __commonJS = (cb, mod) => () => (mod || cb((mod = { exports: {} }).exports, mod), mod.exports);
 var __returnValue = (v) => v;
 function __exportSetter(name, newValue) {
@@ -33631,6 +33649,7 @@ var prevFighters = null;
 var interpProgress = 0;
 var activeEvents = [];
 var matchActive = false;
+var activeMatchId = null;
 var statusEl;
 var timerText;
 var matchInfoText;
@@ -33787,6 +33806,7 @@ async function main() {
     },
     onMatchStart(msg) {
       matchActive = true;
+      activeMatchId = msg.matchId;
       waitingFighterName = null;
       matchInfoText.text = "";
       showAnnouncement("FIGHT!", 16763904);
@@ -33803,8 +33823,11 @@ async function main() {
       console.log(`Match started: ${msg.fighters[0]} vs ${msg.fighters[1]}`);
     },
     onMatchState(msg) {
+      if (activeMatchId && msg.matchId !== activeMatchId)
+        return;
       if (!matchActive) {
         matchActive = true;
+        activeMatchId = msg.matchId;
         matchInfoText.text = "";
       }
       prevFighters = currentFighters;
@@ -33856,7 +33879,10 @@ async function main() {
       timerText.text = `${Math.ceil(msg.timeRemaining / 5)}s`;
     },
     onMatchEnd(msg) {
+      if (activeMatchId && msg.matchId !== activeMatchId)
+        return;
       matchActive = false;
+      activeMatchId = null;
       const resultText = msg.winner ? `${msg.winner} WINS!` : "DRAW!";
       showAnnouncement(resultText, msg.winner ? 16729156 : 16763904);
       setTimeout(() => {

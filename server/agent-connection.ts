@@ -81,7 +81,8 @@ export function handleAgentMessage(
         return;
       }
       const now = Date.now();
-      // Anti-heuristic: ignore actions that arrive too fast after state was sent
+      // Anti-heuristic policy: player agents must use LLMs, not heuristics.
+      // Actions arriving faster than MIN_RESPONSE_MS are silently dropped.
       const sentAt = engine.lastStateSentAt.get(ws.data.agentId);
       if (sentAt && now - sentAt < MIN_RESPONSE_MS) {
         break; // silently drop — agent responded too fast

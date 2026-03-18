@@ -78,6 +78,11 @@ const server = Bun.serve({
       return serveStatic("arena.html");
     }
 
+    // Play page (browser LLM agent)
+    if (url.pathname === "/play") {
+      return serveStatic("play.html");
+    }
+
     // Developers page
     if (url.pathname === "/developers") {
       return serveStatic("developers.html");

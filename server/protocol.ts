@@ -126,7 +126,9 @@ export type SpectatorControlMessage =
 export const ARENA_WIDTH = 10;
 export const TICK_MS = 400;
 export const MATCH_DURATION_TICKS = 150; // 60 seconds
-export const MIN_RESPONSE_MS = 100; // anti-heuristic: ignore actions faster than this
+// Anti-heuristic policy: agents must use LLMs, not hardcoded heuristics.
+// Actions arriving faster than this threshold are silently dropped.
+export const MIN_RESPONSE_MS = 100;
 export const MAX_HP = 100;
 export const ATTACK_RANGE = 2;
 
