@@ -78,6 +78,11 @@ const server = Bun.serve({
       return serveStatic("arena.html");
     }
 
+    // Developers page
+    if (url.pathname === "/developers") {
+      return serveStatic("developers.html");
+    }
+
     // llms.txt for AI agent discoverability
     if (url.pathname === "/llms.txt") {
       return serveStatic("llms.txt");

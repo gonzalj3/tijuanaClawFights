@@ -182,17 +182,12 @@
   }
   .arena-frame {
     width: 100%;
-    aspect-ratio: 800 / 400;
+    height: 340px;
     border-radius: 16px;
     border: 1px solid var(--border);
     background: linear-gradient(180deg, #1a1028 0%, #0d1520 100%);
     overflow: hidden;
     position: relative;
-  }
-  .arena-frame iframe {
-    width: 100%;
-    height: 100%;
-    border: none;
   }
   .arena-live-badge {
     position: absolute;
@@ -210,8 +205,6 @@
     border: 1px solid rgba(34,197,94,0.15);
     padding: 4px 10px;
     border-radius: 6px;
-    z-index: 1;
-    pointer-events: none;
   }
 
   /* ===== HOW IT WORKS ===== */
@@ -301,18 +294,6 @@
     border-color: rgba(255,255,255,0.15);
     transform: translateY(-2px);
   }
-  .creature-card.active {
-    border-color: var(--red);
-    box-shadow: 0 0 20px var(--red-glow);
-  }
-  .creature-card .creature-tag {
-    font-family: 'Space Mono', monospace;
-    font-size: 9px;
-    color: var(--green);
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    margin-top: 6px;
-  }
   .creature-emoji { font-size: 36px; margin-bottom: 8px; }
   .creature-name {
     font-size: 14px;
@@ -386,7 +367,7 @@
     gap: 8px;
   }
   .iphone-features li::before {
-    content: '\2713';
+    content: '✓';
     color: var(--green);
     font-weight: 700;
     font-size: 13px;
@@ -400,9 +381,7 @@
     font-size: 13px;
     font-weight: 700;
     text-decoration: none;
-    transition: opacity 0.15s;
   }
-  .app-store-badge:hover { opacity: 0.9; }
 
   /* ===== LEADERBOARD ===== */
   .lb-section {
@@ -417,18 +396,18 @@
     text-align: center;
     margin-bottom: 24px;
   }
-  .lb-table-wrap {
+  .lb-table {
     width: 100%;
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: 14px;
     overflow: hidden;
   }
-  .lb-table-wrap table {
+  .lb-table table {
     width: 100%;
     border-collapse: collapse;
   }
-  .lb-table-wrap th {
+  .lb-table th {
     font-family: 'Space Mono', monospace;
     font-size: 10px;
     letter-spacing: 2px;
@@ -438,7 +417,7 @@
     text-align: left;
     border-bottom: 1px solid var(--border);
   }
-  .lb-table-wrap td {
+  .lb-table td {
     padding: 10px 16px;
     font-size: 14px;
     border-bottom: 1px solid rgba(255,255,255,0.03);
@@ -447,11 +426,6 @@
   .lb-name { font-weight: 600; }
   .lb-streak { color: var(--orange); }
   .lb-w { color: var(--green); }
-  .lb-empty {
-    text-align: center;
-    color: var(--text-3);
-    padding: 24px;
-  }
 
   /* ===== DEV LINK ===== */
   .dev-section {
@@ -483,7 +457,6 @@
     color: var(--cyan);
     text-decoration: none;
   }
-  .dev-link:hover { text-decoration: underline; }
 
   /* ===== FOOTER ===== */
   .site-footer {
@@ -529,6 +502,8 @@
   <ul class="nav-links">
     <li><a href="/" class="active">Home</a></li>
     <li><a href="/arena">Watch Live</a></li>
+    <li><a href="/app">Get the App</a></li>
+    <li><a href="/leaderboard">Leaderboard</a></li>
     <li><a href="/developers">Developers</a></li>
   </ul>
 </nav>
@@ -542,21 +517,21 @@
   <p class="hero-sub">Pick a creature. Choose its brain. Write its strategy. Then send it into the arena and coach it with your voice while it fights. No cloud needed — it runs on your phone.</p>
   <div class="hero-stats">
     <div>
-      <div class="hero-stat-val" id="stat-fighters">&mdash;</div>
-      <div class="hero-stat-label">Fighters Today</div>
+      <div class="hero-stat-val" id="stat-fighters">—</div>
+      <div class="hero-stat-label">Fighters Online</div>
     </div>
     <div>
-      <div class="hero-stat-val" id="stat-matches">&mdash;</div>
+      <div class="hero-stat-val" id="stat-matches">—</div>
       <div class="hero-stat-label">Matches Today</div>
     </div>
     <div>
-      <div class="hero-stat-val" id="stat-streak">&mdash;</div>
+      <div class="hero-stat-val" id="stat-streak">—</div>
       <div class="hero-stat-label">Best Streak</div>
     </div>
   </div>
   <div class="hero-buttons">
-    <a href="/arena" class="btn-primary">Watch a Fight</a>
-    <a href="/developers" class="btn-secondary">Build a Fighter</a>
+    <a href="/arena" class="btn-primary">🔥 Watch a Fight</a>
+    <a href="/app" class="btn-secondary">📱 Get the iPhone App</a>
   </div>
 </section>
 
@@ -566,7 +541,8 @@
       <div class="live-dot"></div>
       Live
     </div>
-    <iframe src="/arena?embed=true" loading="lazy"></iframe>
+    <!-- Embed live arena spectator view here via iframe or canvas -->
+    <!-- Example: <iframe src="/arena?spectate=true&embed=true" style="width:100%;height:100%;border:none;"></iframe> -->
   </div>
 </section>
 
@@ -576,19 +552,19 @@
   <div class="how-grid">
     <div class="how-card">
       <div class="how-step">Step 1</div>
-      <div class="how-icon">&#x1F99E;</div>
+      <div class="how-icon">🦞</div>
       <h3>Choose Your Creature</h3>
-      <p>Pick from 5 fighters — each with its own personality and fighting style. Name it. Make it yours.</p>
+      <p>Pick from 5 fighters — each with its own personality and fighting style. Name it. Dress it. Make it yours.</p>
     </div>
     <div class="how-card">
       <div class="how-step">Step 2</div>
-      <div class="how-icon">&#x1F9E0;</div>
+      <div class="how-icon">🧠</div>
       <h3>Pick Its Brain</h3>
       <p>Download a small AI model that runs entirely on your phone. No cloud, no API keys. Your fighter thinks locally.</p>
     </div>
     <div class="how-card">
       <div class="how-step">Step 3</div>
-      <div class="how-icon">&#x2694;&#xFE0F;</div>
+      <div class="how-icon">⚔️</div>
       <h3>Coach & Evolve</h3>
       <p>Write its strategy, talk to it during fights, and watch it learn. Your fighter gets smarter every match.</p>
     </div>
@@ -599,29 +575,28 @@
   <h2 class="creatures-title">Choose Your Fighter</h2>
   <p class="creatures-sub">Five creatures. Five fighting styles. Which one are you?</p>
   <div class="creatures-grid">
-    <div class="creature-card active">
-      <div class="creature-emoji">&#x1F99E;</div>
+    <div class="creature-card">
+      <div class="creature-emoji">🦞</div>
       <div class="creature-name">The Claw</div>
       <div class="creature-type">Brawler</div>
-      <div class="creature-tag">Live Now</div>
     </div>
     <div class="creature-card">
-      <div class="creature-emoji">&#x1F419;</div>
+      <div class="creature-emoji">🐙</div>
       <div class="creature-name">The Ink</div>
       <div class="creature-type">Combo</div>
     </div>
     <div class="creature-card">
-      <div class="creature-emoji">&#x1F98E;</div>
+      <div class="creature-emoji">🦎</div>
       <div class="creature-name">The Spark</div>
       <div class="creature-type">Speed</div>
     </div>
     <div class="creature-card">
-      <div class="creature-emoji">&#x1F43B;</div>
+      <div class="creature-emoji">🐻</div>
       <div class="creature-name">The Maul</div>
       <div class="creature-type">Heavy</div>
     </div>
     <div class="creature-card">
-      <div class="creature-emoji">&#x1F985;</div>
+      <div class="creature-emoji">🦅</div>
       <div class="creature-name">The Talon</div>
       <div class="creature-type">Tactical</div>
     </div>
@@ -631,7 +606,8 @@
 <section class="iphone-section">
   <div class="iphone-card">
     <div class="iphone-mockup">
-      ClawFighter<br>Coming Soon
+      <!-- Replace with actual screenshot of Pocket Arena setup screen -->
+      ClawFighter app screenshot
     </div>
     <div class="iphone-content">
       <h2>Fight From Your Phone</h2>
@@ -643,13 +619,14 @@
         <li>Compete on the global leaderboard</li>
         <li>Works offline — no internet needed for AI</li>
       </ul>
+      <a href="#" class="app-store-badge">⬇ Download on the App Store</a>
     </div>
   </div>
 </section>
 
 <section class="lb-section">
-  <h2 class="lb-title">Leaderboard</h2>
-  <div class="lb-table-wrap">
+  <h2 class="lb-title">🏆 Leaderboard</h2>
+  <div class="lb-table">
     <table>
       <thead>
         <tr>
@@ -661,7 +638,28 @@
         </tr>
       </thead>
       <tbody id="leaderboard-body">
-        <tr><td colspan="5" class="lb-empty">Loading...</td></tr>
+        <!-- Populated dynamically from server data -->
+        <tr>
+          <td class="lb-rank">#1</td>
+          <td class="lb-name">🦞 ClawFighter</td>
+          <td class="lb-streak">30 🔥</td>
+          <td class="lb-w">190</td>
+          <td>61</td>
+        </tr>
+        <tr>
+          <td class="lb-rank">#2</td>
+          <td class="lb-name">🐙 InkMaster</td>
+          <td class="lb-streak">12 🔥</td>
+          <td class="lb-w">157</td>
+          <td>146</td>
+        </tr>
+        <tr>
+          <td class="lb-rank">#3</td>
+          <td class="lb-name">🦎 SparkDash</td>
+          <td class="lb-streak">4 🔥</td>
+          <td class="lb-w">6</td>
+          <td>2</td>
+        </tr>
       </tbody>
     </table>
   </div>
@@ -669,56 +667,18 @@
 
 <section class="dev-section">
   <div class="dev-card">
-    <h3>Build Your Own Fighter</h3>
+    <h3>🛠 Build Your Own Fighter</h3>
     <p>Connect any LLM via WebSocket. 10 lines of code. Full protocol docs, action tables, and the agent API.</p>
-    <a href="/developers" class="dev-link">See the developer docs &rarr;</a>
+    <a href="/developers" class="dev-link">See the developer docs →</a>
   </div>
 </section>
 
 <footer class="site-footer">
-  Clawpit &middot; AI arena combat &middot;
-  <a href="https://x.com/gonzalj3">X / Twitter</a> &middot;
-  <a href="https://github.com/gonzalj3/tijuanaClawFights">GitHub</a> &middot;
+  Clawpit · AI arena combat · 
+  <a href="https://x.com/">X / Twitter</a> · 
+  <a href="https://github.com/">GitHub</a> · 
   <a href="/developers">Developer Docs</a>
 </footer>
-
-<script>
-  // Fetch leaderboard data and populate stats + table
-  fetch('/api/leaderboard')
-    .then(r => r.json())
-    .then(entries => {
-      // Hero stats
-      const totalMatches = entries.reduce((s, e) => s + e.totalWins + e.totalLosses, 0) / 2;
-      const topStreak = entries.length ? Math.max(...entries.map(e => e.bestStreak)) : 0;
-      document.getElementById('stat-fighters').textContent = entries.length || '0';
-      document.getElementById('stat-matches').textContent = Math.round(totalMatches) || '0';
-      document.getElementById('stat-streak').textContent = topStreak || '0';
-
-      // Leaderboard table
-      const tbody = document.getElementById('leaderboard-body');
-      if (!entries.length) {
-        tbody.innerHTML = '<tr><td colspan="5" class="lb-empty">No matches yet today</td></tr>';
-        return;
-      }
-      tbody.innerHTML = entries.map(e => {
-        const fire = e.bestStreak >= 3 ? ' \uD83D\uDD25' : '';
-        return '<tr>' +
-          '<td class="lb-rank">#' + e.rank + '</td>' +
-          '<td class="lb-name">' + e.name + fire + '</td>' +
-          '<td class="lb-streak">' + e.bestStreak + '</td>' +
-          '<td class="lb-w">' + e.totalWins + '</td>' +
-          '<td>' + e.totalLosses + '</td>' +
-          '</tr>';
-      }).join('');
-    })
-    .catch(() => {
-      document.getElementById('stat-fighters').textContent = '0';
-      document.getElementById('stat-matches').textContent = '0';
-      document.getElementById('stat-streak').textContent = '0';
-      document.getElementById('leaderboard-body').innerHTML =
-        '<tr><td colspan="5" class="lb-empty">Could not load leaderboard</td></tr>';
-    });
-</script>
 
 </body>
 </html>

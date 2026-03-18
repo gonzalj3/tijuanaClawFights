@@ -175,3 +175,19 @@ h1 {
 .agent-log .msg.msg-out {
   color: #888;
 }
+
+/* Embed mode — strip all chrome, show only the game canvas */
+body.embed-mode {
+  background: transparent;
+}
+body.embed-mode .arena-title,
+body.embed-mode #status,
+body.embed-mode #controls,
+body.embed-mode #leaderboard,
+body.embed-mode #agent-panels {
+  display: none !important;
+}
+body.embed-mode #game-container {
+  border: none;
+  border-radius: 0;
+}

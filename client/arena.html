@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>Tijuana Claw Fights</h1>
+  <h1 class="arena-title">Tijuana Claw Fights</h1>
   <p id="status">Connecting...</p>
   <div id="controls">
     <button id="dismiss-btn" style="display:none">I will send my claw to fight</button>
@@ -41,5 +41,11 @@
     </div>
   </div>
   <script type="module" src="/dist/renderer.js"></script>
+  <script>
+    // Embed mode: strip chrome for iframe embedding
+    if (new URLSearchParams(location.search).has('embed')) {
+      document.body.classList.add('embed-mode');
+    }
+  </script>
 </body>
 </html>
