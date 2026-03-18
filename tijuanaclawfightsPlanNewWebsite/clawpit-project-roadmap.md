@@ -1,7 +1,7 @@
-# Clawpit — Project Roadmap & Feature Specifications
+# Arena Claw Fights — Project Roadmap & Feature Specifications
 
 **Last updated:** March 18, 2026
-**Domains:** clawpit.com (umbrella brand), tijuanaclawfights.com (original arena), arenaclawfights.com (redirect/reserve)
+**Domains:** arenaclawfights.com (umbrella brand), tijuanaclawfights.com (original arena), arenaclawfights.com (redirect/reserve)
 **iOS App Name:** ClawFighter
 **Stack:** Swift 6.2, SwiftUI with @Observable, iOS 17+, xcodegen, mlx-swift-lm, URLSession WebSocket
 
@@ -19,7 +19,7 @@
 8. [Social & Community Features (Feature Layer 4)](#8-social--community-features)
 9. [Arena Experience Enhancements (Feature Layer 5)](#9-arena-experience-enhancements)
 10. [iOS App UI Redesign — Pocket Arena](#10-ios-app-ui-redesign--pocket-arena)
-11. [Website Redesign — clawpit.com](#11-website-redesign--clawpitcom)
+11. [Website Redesign — arenaclawfights.com](#11-website-redesign--arenaclawfightscom)
 12. [Website Technical Changes](#12-website-technical-changes)
 13. [Marketing & Growth Strategy](#13-marketing--growth-strategy)
 14. [Prioritized Build Order](#14-prioritized-build-order)
@@ -45,7 +45,7 @@ The user is a **coach**, not an engineer. Every piece of UI language, every feat
 
 ### Brand Hierarchy
 
-- **Clawpit** — The universe. The umbrella brand. "Welcome to the Clawpit."
+- **Arena Claw Fights** — The universe. The umbrella brand. "Welcome to the Arena."
 - **ClawFighter** — The iOS app. The player identity. "You are a ClawFighter."
 - **Tijuana Claw Fights** — The original arena. The first and most legendary pit.
 - **[Location] [Creature] Fights** — Future arenas (Alaska Maul Fights, Tokyo Ink Fights, etc.)
@@ -123,7 +123,7 @@ Each arena is a themed location in the world with its own pixel-art background, 
 One server, one codebase, arena selection via parameter.
 
 - **Phase 1 (now):** Single arena (Tijuana). The iOS app setup screen shows an "Arena" row displaying "🦞 Tijuana" with a disclosure chevron. Tapping opens a list with one active arena and four locked ones showing the creature emoji, name, and "Coming Soon." Zero backend work, creates anticipation.
-- **Phase 2 (when users exist):** Subdomains under clawpit.com. `tijuana.clawpit.com`, `alaska.clawpit.com`, `tokyo.clawpit.com`. Same server, theme parameter changes arena background art, leaderboard styling, ambient vibe. One domain registration, subdomains are free.
+- **Phase 2 (when users exist):** Subdomains under arenaclawfights.com. `tijuana.arenaclawfights.com`, `alaska.arenaclawfights.com`, `tokyo.arenaclawfights.com`. Same server, theme parameter changes arena background art, leaderboard styling, ambient vibe. One domain registration, subdomains are free.
 - **Phase 3 (real feature):** Separate WebSocket rooms per arena on the same server. Each arena has its own matchmaking queue, leaderboard, and potentially rule modifiers.
 
 ### Arena Themes
@@ -174,7 +174,7 @@ Give the fighter a persistent visual identity that appears throughout the app an
 - **Leaderboard:** Your fighter's avatar and emoji appear next to your rank
 - **Evolution screen:** Fighter "reacts" to training results (happy face on win streak, determined face on losses)
 - **Share sheet:** One-tap generates a shareable image card for X.com / social media
-- **Website:** Public fighter profile page at `clawpit.com/fighter/[name]`
+- **Website:** Public fighter profile page at `arenaclawfights.com/fighter/[name]`
 
 ### Shareable Image Card Format
 
@@ -185,7 +185,7 @@ A generated PNG image showing:
 - Win/loss record
 - Current streak
 - Arena name
-- "Train yours at clawpit.com" footer CTA
+- "Train yours at arenaclawfights.com" footer CTA
 
 This image is the primary viral mechanic. Every share to X.com is free marketing.
 
@@ -324,7 +324,7 @@ Without taking a class or reading a tutorial:
 - Generate a shareable image card (trading card format) showing fighter avatar, stats, title, model, record
 - One-tap share to X/Twitter/Instagram
 - Primary viral mechanic — every shared card is free marketing
-- Link goes to public profile page at `clawpit.com/fighter/[name]`
+- Link goes to public profile page at `arenaclawfights.com/fighter/[name]`
 
 ### Rivalry System
 - Track repeated matchups against the same opponent
@@ -415,7 +415,7 @@ Warm, friendly, collectible-creature inspired. Light cream background, white car
 
 ---
 
-## 11. Website Redesign — clawpit.com
+## 11. Website Redesign — arenaclawfights.com
 
 ### Goal
 
@@ -445,7 +445,7 @@ Move all technical content here:
 
 ### Public Fighter Profile Pages
 
-New page: `clawpit.com/fighter/[name]`
+New page: `arenaclawfights.com/fighter/[name]`
 - Fighter card (avatar, record, title, creature type, streak)
 - Recent match history
 - "Download the app to build yours" CTA
