@@ -117,14 +117,6 @@ export class GameEngine {
               : false;
             if (realAgentsWaiting) {
               console.log(`[NPC] Stepping aside — real agent waiting in queue`);
-              // Safety net: if the "waiting" agent was a stale queue entry,
-              // re-queue NPC after a delay so it doesn't get stuck
-              const npcRef = this.npc;
-              setTimeout(() => {
-                if (npcRef && !npcRef.isDismissed && !this.npcMatchId) {
-                  this.checkNpcRespawn();
-                }
-              }, 8000);
             } else {
               // No one waiting — re-queue NPC for next match
               const npcRef = this.npc;
