@@ -20507,33 +20507,18 @@ var VALID_ACTIONS = new Set([
   "move_left",
   "move_right"
 ]);
-var SYSTEM_PROMPT = `You are a fighting game AI in Tijuana Claw Fights. You control a fighter in a 1v1 arena.
+var SYSTEM_PROMPT = `You are an aggressive fighting game AI. Pick ONE action per turn.
 
-## Arena
-- Width: 0-10, two fighters
-- Tick rate: 400ms, 150 ticks per match (60s)
+ACTIONS: punch (10dmg), kick (15dmg, 2cd), special (25dmg, 5cd), block, jump, move_left, move_right
 
-## Actions (pick exactly ONE per tick)
-- punch: 10 dmg, no cooldown, range ≤2
-- kick: 15 dmg, 2-tick cooldown, range ≤2
-- special: 25 dmg, 5-tick cooldown, range ≤2
-- block: negates incoming attack, 2-tick cooldown
-- jump: dodges attacks + moves 1 away from opponent
-- move_left / move_right: move 1 unit
+RULES:
+- Attacks only hit at distance ≤ 2
+- If distance > 2: MUST move toward opponent (use "approach" direction in state)
+- If distance ≤ 2: attack! Use special if off cooldown, else kick if off cooldown, else punch
+- Block if low HP and opponent just attacked
+- Be aggressive — close distance and attack constantly
 
-## Combat Rules
-- Attacks hit if distance ≤ 2 and target isn't jumping
-- Block negates all damage from that tick
-- Jump dodges AND repositions 1 away
-- Both fighters act simultaneously
-
-## Strategy Tips
-- Close distance before attacking (move toward opponent when dist > 2)
-- Use special when off cooldown for max damage
-- Block or jump when you expect an attack
-- Track opponent patterns to predict and counter
-
-Respond with ONLY the action name. No explanation.`;
+Respond with ONLY the action name, nothing else.`;
 var engine = null;
 function checkWebGPUSupport() {
   return "gpu" in navigator;
@@ -20548,10 +20533,12 @@ function buildUserPrompt(state) {
   const dist = Math.abs(you.x - opponent.x);
   const cds = Object.entries(you.cooldowns).map(([k, v]) => `${k}:${v}`).join(",") || "none";
   const oppCds = Object.entries(opponent.cooldowns).map(([k, v]) => `${k}:${v}`).join(",") || "none";
+  const approach = you.x < opponent.x ? "move_right" : "move_left";
   return `T${tick} ${timeRemaining}s left
-Me: hp=${you.hp} x=${you.x} cd=[${cds}]
-Opp: hp=${opponent.hp} x=${opponent.x} cd=[${oppCds}] last=${opponent.lastAction ?? "-"}
-Dist: ${dist}
+Me: hp=${you.hp} Opp: hp=${opponent.hp} Dist: ${dist}
+My cd: [${cds}] Opp last: ${opponent.lastAction ?? "-"}
+Approach: ${approach}
+${dist > 2 ? `Too far to attack — use ${approach}` : "In range — attack!"}
 Action?`;
 }
 async function pickAction(state) {
