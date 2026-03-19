@@ -70,6 +70,7 @@ let wins = 0;
 let losses = 0;
 let draws = 0;
 let lastStateTick = -1;
+let lastStateReceivedAt = 0; // timestamp of most recent game_state (including skipped)
 
 const MIN_RESPONSE_MS = 120; // floor to clear server's anti-heuristic filter
 
@@ -199,6 +200,7 @@ function connectAgent() {
 function onGameState(msg: any) {
   const dist = Math.abs(msg.you.x - msg.opponent.x);
   tickDisplay.textContent = `T${msg.tick}  ${Math.ceil(msg.timeRemaining)}s`;
+  lastStateReceivedAt = Date.now(); // track for anti-heuristic delay
 
   // If already inferring for a previous tick, skip this one
   if (inferring) {
@@ -235,8 +237,10 @@ function onGameState(msg: any) {
     }
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
-    // Ensure we meet the minimum response time to pass anti-heuristic filter
-    const delay = Math.max(0, MIN_RESPONSE_MS - elapsed);
+    // Ensure action arrives ≥120ms after the MOST RECENT game_state from server
+    // (server checks against last state it sent, which keeps ticking during inference)
+    const msSinceLastState = Date.now() - lastStateReceivedAt;
+    const delay = Math.max(0, MIN_RESPONSE_MS - msSinceLastState);
 
     const send = () => {
       if (ws && ws.readyState === WebSocket.OPEN) {

@@ -20655,6 +20655,7 @@ var wins = 0;
 var losses = 0;
 var draws = 0;
 var lastStateTick = -1;
+var lastStateReceivedAt = 0;
 var MIN_RESPONSE_MS = 120;
 var savedName = localStorage.getItem("clawfights-name");
 if (savedName) {
@@ -20759,6 +20760,7 @@ function connectAgent() {
 function onGameState(msg) {
   const dist = Math.abs(msg.you.x - msg.opponent.x);
   tickDisplay.textContent = `T${msg.tick}  ${Math.ceil(msg.timeRemaining)}s`;
+  lastStateReceivedAt = Date.now();
   if (inferring) {
     log2("log-skip", `T${msg.tick} ⏭ skipped (LLM still thinking)`);
     return;
@@ -20788,7 +20790,8 @@ function onGameState(msg) {
     }
     if (!ws || ws.readyState !== WebSocket.OPEN)
       return;
-    const delay = Math.max(0, MIN_RESPONSE_MS - elapsed);
+    const msSinceLastState = Date.now() - lastStateReceivedAt;
+    const delay = Math.max(0, MIN_RESPONSE_MS - msSinceLastState);
     const send = () => {
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({
