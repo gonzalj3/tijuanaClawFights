@@ -20625,11 +20625,21 @@ function log2(cls, text) {
 }
 var coachBar = document.getElementById("coach-bar");
 var shoutButtons = document.querySelectorAll(".shout-btn");
+var coachPopup = document.getElementById("coach-popup");
+var coachImg = document.getElementById("coach-img");
+var speechBubble = document.getElementById("speech-bubble");
+var COACH_SPRITES = ["/assets/coach-male.png", "/assets/coach-female.png"];
 var SHOUT_HINTS = {
   attack: "ATTACK! Use your strongest available move!",
   movein: "CLOSE THE DISTANCE! Move toward the opponent NOW!",
   retreat: "BACK OFF! Jump or move away from the opponent!",
   block: "DEFEND! Block the next attack!"
+};
+var SHOUT_LABELS = {
+  attack: "ATTACK!",
+  movein: "MOVE IN!",
+  retreat: "RETREAT!",
+  block: "BLOCK!"
 };
 var coachShout = null;
 var shoutTicksLeft = 0;
@@ -20641,12 +20651,16 @@ shoutButtons.forEach((btn) => {
     shoutButtons.forEach((b) => b.classList.remove("shout-active"));
     btn.classList.add("shout-active");
     log2("log-info", `Coach: ${btn.textContent}`);
+    coachImg.src = COACH_SPRITES[Math.random() < 0.5 ? 0 : 1];
+    speechBubble.textContent = SHOUT_LABELS[key];
+    coachPopup.classList.add("visible");
   });
 });
 function clearShout() {
   coachShout = null;
   shoutTicksLeft = 0;
   shoutButtons.forEach((b) => b.classList.remove("shout-active"));
+  coachPopup.classList.remove("visible");
 }
 var ws = null;
 var modelReady = false;
