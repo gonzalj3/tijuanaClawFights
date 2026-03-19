@@ -1,9 +1,17 @@
 // Browser LLM wrapper using WebLLM (runs quantized models via WebGPU)
 // No heuristic fallback — returns null if inference fails or model isn't ready.
 
-import { CreateMLCEngine, type MLCEngine, type InitProgressReport } from "@mlc-ai/web-llm";
+import { CreateMLCEngine, hasModelInCache, type MLCEngine, type InitProgressReport } from "@mlc-ai/web-llm";
 
 const MODEL_ID = "Qwen2.5-0.5B-Instruct-q4f16_1-MLC";
+
+export async function isModelCached(): Promise<boolean> {
+  try {
+    return await hasModelInCache(MODEL_ID);
+  } catch {
+    return false;
+  }
+}
 
 const VALID_ACTIONS = new Set([
   "punch", "kick", "special", "block", "jump", "move_left", "move_right",

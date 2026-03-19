@@ -2,7 +2,7 @@
 // Downloads a quantized model via WebLLM and plays using in-browser inference.
 // No heuristic fallback — if LLM isn't ready or inference is slow, ticks are skipped.
 
-import { checkWebGPUSupport, initEngine, pickAction, type GameState } from "./browser-llm";
+import { checkWebGPUSupport, initEngine, isModelCached, pickAction, type GameState } from "./browser-llm";
 
 // ─── DOM Elements ───────────────────────────────────────────────
 const statusEl = document.getElementById("status")!;
@@ -73,6 +73,20 @@ let lastStateTick = -1;
 
 const MIN_RESPONSE_MS = 120; // floor to clear server's anti-heuristic filter
 
+// ─── Name Persistence ───────────────────────────────────────────
+const savedName = localStorage.getItem("clawfights-name");
+if (savedName) {
+  nameInput.value = savedName;
+}
+nameInput.addEventListener("change", () => {
+  const val = nameInput.value.trim();
+  if (val) {
+    localStorage.setItem("clawfights-name", val);
+  } else {
+    localStorage.removeItem("clawfights-name");
+  }
+});
+
 // ─── WebGPU Check ───────────────────────────────────────────────
 if (!checkWebGPUSupport()) {
   webgpuError.style.display = "block";
@@ -83,7 +97,10 @@ if (!checkWebGPUSupport()) {
 
 // ─── Model Download ─────────────────────────────────────────────
 async function downloadModel() {
-  statusEl.textContent = "Downloading AI model...";
+  const cached = await isModelCached();
+  statusEl.textContent = cached
+    ? "Loading AI model from cache..."
+    : "Downloading AI model (first time only)...";
   progressSection.style.display = "block";
 
   try {

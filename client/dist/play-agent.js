@@ -19509,6 +19509,24 @@ function requireLib() {
   return lib$1.exports;
 }
 var libExports = requireLib();
+function findModelRecord(modelId, appConfig) {
+  const matchedItem = appConfig === null || appConfig === undefined ? undefined : appConfig.model_list.find((item) => item.model_id == modelId);
+  if (matchedItem !== undefined) {
+    return matchedItem;
+  }
+  throw new ModelNotFoundError(modelId);
+}
+function hasModelInCache(modelId, appConfig) {
+  return __awaiter(this, undefined, undefined, function* () {
+    if (appConfig === undefined) {
+      appConfig = prebuiltAppConfig;
+    }
+    const modelRecord = findModelRecord(modelId, appConfig);
+    const modelUrl = cleanModelUrl(modelRecord.model);
+    const cacheType = appConfig.useIndexedDBCache ? "indexeddb" : "cache";
+    return libExports$2.hasTensorInCache(modelUrl, "webllm/model", cacheType);
+  });
+}
 function asyncLoadTokenizer(baseUrl, config, appConfig, logger = console.log) {
   return __awaiter(this, undefined, undefined, function* () {
     let modelCache;
@@ -20498,6 +20516,13 @@ class MLCEngine {
 
 // client/browser-llm.ts
 var MODEL_ID = "Qwen2.5-0.5B-Instruct-q4f16_1-MLC";
+async function isModelCached() {
+  try {
+    return await hasModelInCache(MODEL_ID);
+  } catch {
+    return false;
+  }
+}
 var VALID_ACTIONS = new Set([
   "punch",
   "kick",
@@ -20631,6 +20656,18 @@ var losses = 0;
 var draws = 0;
 var lastStateTick = -1;
 var MIN_RESPONSE_MS = 120;
+var savedName = localStorage.getItem("clawfights-name");
+if (savedName) {
+  nameInput.value = savedName;
+}
+nameInput.addEventListener("change", () => {
+  const val = nameInput.value.trim();
+  if (val) {
+    localStorage.setItem("clawfights-name", val);
+  } else {
+    localStorage.removeItem("clawfights-name");
+  }
+});
 if (!checkWebGPUSupport()) {
   webgpuError.style.display = "block";
   mainContent.style.display = "none";
@@ -20638,7 +20675,8 @@ if (!checkWebGPUSupport()) {
   downloadModel();
 }
 async function downloadModel() {
-  statusEl.textContent = "Downloading AI model...";
+  const cached = await isModelCached();
+  statusEl.textContent = cached ? "Loading AI model from cache..." : "Downloading AI model (first time only)...";
   progressSection.style.display = "block";
   try {
     await initEngine((report) => {
