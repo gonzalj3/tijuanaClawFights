@@ -35,23 +35,11 @@ function log(cls: string, text: string) {
 const coachBar = document.getElementById("coach-bar")!;
 const shoutButtons = document.querySelectorAll<HTMLButtonElement>(".shout-btn");
 
-const coachPopup = document.getElementById("coach-popup")!;
-const coachImg = document.getElementById("coach-img") as HTMLImageElement;
-const speechBubble = document.getElementById("speech-bubble")!;
-const COACH_SPRITES = ["/assets/coach-male.png", "/assets/coach-female.png"];
-
 const SHOUT_HINTS: Record<string, string> = {
   attack: "ATTACK! Use your strongest available move!",
   movein: "CLOSE THE DISTANCE! Move toward the opponent NOW!",
   retreat: "BACK OFF! Jump or move away from the opponent!",
   block: "DEFEND! Block the next attack!",
-};
-
-const SHOUT_LABELS: Record<string, string> = {
-  attack: "ATTACK!",
-  movein: "MOVE IN!",
-  retreat: "RETREAT!",
-  block: "BLOCK!",
 };
 
 let coachShout: string | null = null;
@@ -65,11 +53,6 @@ shoutButtons.forEach((btn) => {
     shoutButtons.forEach((b) => b.classList.remove("shout-active"));
     btn.classList.add("shout-active");
     log("log-info", `Coach: ${btn.textContent}`);
-
-    // Show coach popup with random sprite
-    coachImg.src = COACH_SPRITES[Math.random() < 0.5 ? 0 : 1];
-    speechBubble.textContent = SHOUT_LABELS[key];
-    coachPopup.classList.add("visible");
   });
 });
 
@@ -77,7 +60,6 @@ function clearShout() {
   coachShout = null;
   shoutTicksLeft = 0;
   shoutButtons.forEach((b) => b.classList.remove("shout-active"));
-  coachPopup.classList.remove("visible");
 }
 
 // ─── State ──────────────────────────────────────────────────────
