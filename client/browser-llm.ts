@@ -19,6 +19,7 @@ RULES:
 - If distance ≤ 2: attack! Use special if off cooldown, else kick if off cooldown, else punch
 - Block if low HP and opponent just attacked
 - Be aggressive — close distance and attack constantly
+- If your coach shouts a command, prioritize that action above all else
 
 Respond with ONLY the action name, nothing else.`;
 
@@ -55,7 +56,7 @@ export interface GameState {
   timeRemaining: number;
 }
 
-function buildUserPrompt(state: GameState): string {
+function buildUserPrompt(state: GameState, coachHint?: string): string {
   const { you, opponent, tick, timeRemaining } = state;
   const dist = Math.abs(you.x - opponent.x);
 
@@ -69,22 +70,28 @@ function buildUserPrompt(state: GameState): string {
 
   const approach = you.x < opponent.x ? "move_right" : "move_left";
 
-  return `T${tick} ${timeRemaining}s left
+  let prompt = `T${tick} ${timeRemaining}s left
 Me: hp=${you.hp} Opp: hp=${opponent.hp} Dist: ${dist}
 My cd: [${cds}] Opp last: ${opponent.lastAction ?? "-"}
 Approach: ${approach}
-${dist > 2 ? `Too far to attack — use ${approach}` : "In range — attack!"}
-Action?`;
+${dist > 2 ? `Too far to attack — use ${approach}` : "In range — attack!"}`;
+
+  if (coachHint) {
+    prompt += `\nCoach shouts: ${coachHint}`;
+  }
+
+  prompt += `\nAction?`;
+  return prompt;
 }
 
-export async function pickAction(state: GameState): Promise<Action | null> {
+export async function pickAction(state: GameState, coachHint?: string): Promise<Action | null> {
   if (!engine) return null;
 
   try {
     const response = await engine.chat.completions.create({
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: buildUserPrompt(state) },
+        { role: "user", content: buildUserPrompt(state, coachHint) },
       ],
       max_tokens: 10,
       temperature: 0.3,

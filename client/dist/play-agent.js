@@ -20517,6 +20517,7 @@ RULES:
 - If distance ≤ 2: attack! Use special if off cooldown, else kick if off cooldown, else punch
 - Block if low HP and opponent just attacked
 - Be aggressive — close distance and attack constantly
+- If your coach shouts a command, prioritize that action above all else
 
 Respond with ONLY the action name, nothing else.`;
 var engine = null;
@@ -20528,27 +20529,33 @@ async function initEngine(onProgress) {
     initProgressCallback: onProgress
   });
 }
-function buildUserPrompt(state) {
+function buildUserPrompt(state, coachHint) {
   const { you, opponent, tick, timeRemaining } = state;
   const dist = Math.abs(you.x - opponent.x);
   const cds = Object.entries(you.cooldowns).map(([k, v]) => `${k}:${v}`).join(",") || "none";
   const oppCds = Object.entries(opponent.cooldowns).map(([k, v]) => `${k}:${v}`).join(",") || "none";
   const approach = you.x < opponent.x ? "move_right" : "move_left";
-  return `T${tick} ${timeRemaining}s left
+  let prompt = `T${tick} ${timeRemaining}s left
 Me: hp=${you.hp} Opp: hp=${opponent.hp} Dist: ${dist}
 My cd: [${cds}] Opp last: ${opponent.lastAction ?? "-"}
 Approach: ${approach}
-${dist > 2 ? `Too far to attack — use ${approach}` : "In range — attack!"}
+${dist > 2 ? `Too far to attack — use ${approach}` : "In range — attack!"}`;
+  if (coachHint) {
+    prompt += `
+Coach shouts: ${coachHint}`;
+  }
+  prompt += `
 Action?`;
+  return prompt;
 }
-async function pickAction(state) {
+async function pickAction(state, coachHint) {
   if (!engine)
     return null;
   try {
     const response = await engine.chat.completions.create({
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: buildUserPrompt(state) }
+        { role: "user", content: buildUserPrompt(state, coachHint) }
       ],
       max_tokens: 10,
       temperature: 0.3
@@ -20590,6 +20597,31 @@ function log2(cls, text) {
     agentLog.removeChild(agentLog.firstChild);
   }
   agentLog.scrollTop = agentLog.scrollHeight;
+}
+var coachBar = document.getElementById("coach-bar");
+var shoutButtons = document.querySelectorAll(".shout-btn");
+var SHOUT_HINTS = {
+  attack: "ATTACK! Use your strongest available move!",
+  movein: "CLOSE THE DISTANCE! Move toward the opponent NOW!",
+  retreat: "BACK OFF! Jump or move away from the opponent!",
+  block: "DEFEND! Block the next attack!"
+};
+var coachShout = null;
+var shoutTicksLeft = 0;
+shoutButtons.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const key = btn.dataset.shout;
+    coachShout = SHOUT_HINTS[key];
+    shoutTicksLeft = 4;
+    shoutButtons.forEach((b) => b.classList.remove("shout-active"));
+    btn.classList.add("shout-active");
+    log2("log-info", `Coach: ${btn.textContent}`);
+  });
+});
+function clearShout() {
+  coachShout = null;
+  shoutTicksLeft = 0;
+  shoutButtons.forEach((b) => b.classList.remove("shout-active"));
 }
 var ws = null;
 var modelReady = false;
@@ -20659,6 +20691,8 @@ function connectAgent() {
         matchInfoEl.textContent = `Fighting: ${msg.opponent}`;
         lastStateTick = -1;
         inferring = false;
+        clearShout();
+        coachBar.classList.add("in-match");
         log2("log-info", `── Match started vs ${msg.opponent} ──`);
         break;
       case "game_state":
@@ -20701,7 +20735,13 @@ function onGameState(msg) {
     opponent: msg.opponent,
     timeRemaining: msg.timeRemaining
   };
-  pickAction(state).then((action) => {
+  const hint = shoutTicksLeft > 0 ? coachShout : undefined;
+  if (shoutTicksLeft > 0) {
+    shoutTicksLeft--;
+    if (shoutTicksLeft === 0)
+      clearShout();
+  }
+  pickAction(state, hint ?? undefined).then((action) => {
     const elapsed = Date.now() - stateReceivedAt;
     inferring = false;
     if (!action) {
@@ -20729,6 +20769,8 @@ function onGameState(msg) {
   });
 }
 function onMatchEnd(msg) {
+  clearShout();
+  coachBar.classList.remove("in-match");
   const name = nameInput.value.trim() || nameInput.placeholder;
   if (msg.winner === null) {
     draws++;

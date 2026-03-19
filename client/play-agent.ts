@@ -31,6 +31,37 @@ function log(cls: string, text: string) {
   agentLog.scrollTop = agentLog.scrollHeight;
 }
 
+// ─── Coach Shout ────────────────────────────────────────────────
+const coachBar = document.getElementById("coach-bar")!;
+const shoutButtons = document.querySelectorAll<HTMLButtonElement>(".shout-btn");
+
+const SHOUT_HINTS: Record<string, string> = {
+  attack: "ATTACK! Use your strongest available move!",
+  movein: "CLOSE THE DISTANCE! Move toward the opponent NOW!",
+  retreat: "BACK OFF! Jump or move away from the opponent!",
+  block: "DEFEND! Block the next attack!",
+};
+
+let coachShout: string | null = null;
+let shoutTicksLeft = 0;
+
+shoutButtons.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const key = btn.dataset.shout!;
+    coachShout = SHOUT_HINTS[key];
+    shoutTicksLeft = 4;
+    shoutButtons.forEach((b) => b.classList.remove("shout-active"));
+    btn.classList.add("shout-active");
+    log("log-info", `Coach: ${btn.textContent}`);
+  });
+});
+
+function clearShout() {
+  coachShout = null;
+  shoutTicksLeft = 0;
+  shoutButtons.forEach((b) => b.classList.remove("shout-active"));
+}
+
 // ─── State ──────────────────────────────────────────────────────
 let ws: WebSocket | null = null;
 let modelReady = false;
@@ -113,6 +144,8 @@ function connectAgent() {
         matchInfoEl.textContent = `Fighting: ${msg.opponent}`;
         lastStateTick = -1;
         inferring = false;
+        clearShout();
+        coachBar.classList.add("in-match");
         log("log-info", `── Match started vs ${msg.opponent} ──`);
         break;
 
@@ -169,7 +202,13 @@ function onGameState(msg: any) {
     timeRemaining: msg.timeRemaining,
   };
 
-  pickAction(state).then((action) => {
+  const hint = shoutTicksLeft > 0 ? coachShout : undefined;
+  if (shoutTicksLeft > 0) {
+    shoutTicksLeft--;
+    if (shoutTicksLeft === 0) clearShout();
+  }
+
+  pickAction(state, hint ?? undefined).then((action) => {
     const elapsed = Date.now() - stateReceivedAt;
     inferring = false;
 
@@ -203,6 +242,8 @@ function onGameState(msg: any) {
 
 // ─── Match End → Auto Re-queue ──────────────────────────────────
 function onMatchEnd(msg: any) {
+  clearShout();
+  coachBar.classList.remove("in-match");
   const name = nameInput.value.trim() || nameInput.placeholder;
 
   if (msg.winner === null) {
