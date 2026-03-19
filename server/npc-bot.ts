@@ -72,7 +72,7 @@ export class NpcBot {
   }
 
   destroy(): void {
-    // no-op — cleanup hook for future use
+    this.dismissed = true;
   }
 }
 
@@ -141,6 +141,6 @@ export class NpcStationaryBot {
   }
 
   destroy(): void {
-    // no-op
+    this.dismissed = true;
   }
 }
