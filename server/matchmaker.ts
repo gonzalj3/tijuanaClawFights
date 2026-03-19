@@ -81,7 +81,14 @@ export class Matchmaker {
       } else {
         // Auto re-queue after delay so spectators can see results
         const reId = id, reName = name;
-        setTimeout(() => this.enqueue(reId, reName), REMATCH_DELAY_MS);
+        setTimeout(() => {
+          // Re-check: agent may have sent leave_queue during the delay
+          if (this.noAutoRequeue.has(reId)) {
+            console.log(`[Matchmaker] ${reName} skipped delayed re-queue (paused)`);
+            return;
+          }
+          this.enqueue(reId, reName);
+        }, REMATCH_DELAY_MS);
       }
     }
   }
@@ -114,7 +121,14 @@ export class Matchmaker {
     } else {
       // If another agent is already waiting, re-queue quickly so they can fight
       const delay = this.queue.length > 0 ? 1000 : REMATCH_DELAY_MS;
-      setTimeout(() => this.enqueue(agentId, agentName), delay);
+      setTimeout(() => {
+        // Re-check: agent may have sent leave_queue during the delay
+        if (this.noAutoRequeue.has(agentId)) {
+          console.log(`[Matchmaker] ${agentName} skipped delayed re-queue (paused)`);
+          return;
+        }
+        this.enqueue(agentId, agentName);
+      }, delay);
     }
   }
 
