@@ -263,10 +263,11 @@ function onMatchEnd(msg: any) {
   matchInfoEl.textContent = "";
   recordEl.textContent = `W: ${wins}  L: ${losses}  D: ${draws}`;
 
-  // Server auto-requeues via onSingleAgentMatchEnd — just update status
+  // Auto re-queue after 3s
   setTimeout(() => {
     if (ws && ws.readyState === WebSocket.OPEN) {
-      statusEl.textContent = "Next match starting soon...";
+      statusEl.textContent = "Re-joining queue...";
+      ws.send(JSON.stringify({ type: "join_queue" }));
     }
   }, 3000);
 }

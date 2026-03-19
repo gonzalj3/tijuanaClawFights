@@ -20789,7 +20789,8 @@ function onMatchEnd(msg) {
   recordEl.textContent = `W: ${wins}  L: ${losses}  D: ${draws}`;
   setTimeout(() => {
     if (ws && ws.readyState === WebSocket.OPEN) {
-      statusEl.textContent = "Next match starting soon...";
+      statusEl.textContent = "Re-joining queue...";
+      ws.send(JSON.stringify({ type: "join_queue" }));
     }
   }, 3000);
 }
