@@ -17,6 +17,8 @@ const webgpuError = document.getElementById("webgpu-error")!;
 const mainContent = document.getElementById("main-content")!;
 const agentLog = document.getElementById("agent-log")!;
 const tickDisplay = document.getElementById("tick-display")!;
+const arenaOverlay = document.getElementById("arena-overlay")!;
+const arenaOverlayText = document.getElementById("arena-overlay-text")!;
 
 const MAX_LOG_ENTRIES = 150;
 
@@ -35,10 +37,10 @@ function log(cls: string, text: string) {
 const coachBar = document.getElementById("coach-bar")!;
 const shoutButtons = document.querySelectorAll<HTMLButtonElement>(".shout-btn");
 
-const coachPopup = document.getElementById("coach-popup")!;
-const coachImg = document.getElementById("coach-img") as HTMLImageElement;
-const speechBubble = document.getElementById("speech-bubble")!;
-const COACH_SPRITES = ["/assets/coach-male.png", "/assets/coach-female.png"];
+const coachPopupMale = document.getElementById("coach-popup-male")!;
+const coachPopupFemale = document.getElementById("coach-popup-female")!;
+const speechBubbleMale = document.getElementById("speech-bubble-male")!;
+const speechBubbleFemale = document.getElementById("speech-bubble-female")!;
 
 const SHOUT_HINTS: Record<string, string> = {
   attack: "ATTACK! Use your strongest available move!",
@@ -66,10 +68,14 @@ shoutButtons.forEach((btn) => {
     btn.classList.add("shout-active");
     log("log-info", `Coach: ${btn.textContent}`);
 
-    // Show coach popup with random sprite
-    coachImg.src = COACH_SPRITES[Math.random() < 0.5 ? 0 : 1];
-    speechBubble.textContent = SHOUT_LABELS[key];
-    coachPopup.classList.add("visible");
+    // Show coach popup: female for attack/movein, male for retreat/block
+    coachPopupMale.classList.remove("visible");
+    coachPopupFemale.classList.remove("visible");
+    const isMale = key === "retreat" || key === "block";
+    const popup = isMale ? coachPopupMale : coachPopupFemale;
+    const bubble = isMale ? speechBubbleMale : speechBubbleFemale;
+    bubble.textContent = SHOUT_LABELS[key];
+    popup.classList.add("visible");
   });
 });
 
@@ -77,7 +83,8 @@ function clearShout() {
   coachShout = null;
   shoutTicksLeft = 0;
   shoutButtons.forEach((b) => b.classList.remove("shout-active"));
-  coachPopup.classList.remove("visible");
+  coachPopupMale.classList.remove("visible");
+  coachPopupFemale.classList.remove("visible");
 }
 
 // ─── State ──────────────────────────────────────────────────────
@@ -146,6 +153,8 @@ fightBtn.onclick = () => {
     fightBtn.textContent = "Fight!";
     statusEl.textContent = "Disconnected.";
     matchInfoEl.textContent = "";
+    coachBar.classList.remove("in-match");
+    clearShout();
     return;
   }
   connectAgent();
@@ -169,10 +178,12 @@ function connectAgent() {
       case "registered":
         statusEl.textContent = "Registered! Joining queue...";
         ws!.send(JSON.stringify({ type: "join_queue" }));
+        coachBar.classList.add("in-match");
         break;
 
       case "queued":
         statusEl.textContent = "In queue — waiting for opponent...";
+        arenaOverlayText.innerHTML = `Waiting for opponent...<span>Spectating other fights in the meantime</span>`;
         break;
 
       case "match_start":
@@ -182,6 +193,7 @@ function connectAgent() {
         inferring = false;
         clearShout();
         coachBar.classList.add("in-match");
+        arenaOverlay.classList.add("hidden");
         log("log-info", `── Match started vs ${msg.opponent} ──`);
         break;
 
@@ -207,6 +219,10 @@ function connectAgent() {
     statusEl.textContent = "Disconnected.";
     fightBtn.textContent = "Fight!";
     matchInfoEl.textContent = "";
+    coachBar.classList.remove("in-match");
+    clearShout();
+    arenaOverlay.classList.remove("hidden");
+    arenaOverlayText.innerHTML = `Spectating other fights...<span>Your match will appear here once you join</span>`;
   };
 
   ws.onerror = () => {
@@ -283,6 +299,7 @@ function onGameState(msg: any) {
 function onMatchEnd(msg: any) {
   clearShout();
   coachBar.classList.remove("in-match");
+  arenaOverlay.classList.remove("hidden");
   const name = nameInput.value.trim() || nameInput.placeholder;
 
   if (msg.winner === null) {

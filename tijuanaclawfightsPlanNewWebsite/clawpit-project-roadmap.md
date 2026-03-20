@@ -18,7 +18,7 @@
 7. [Training Mode & Leveling System (Feature Layer 3)](#7-training-mode--leveling-system)
 8. [Social & Community Features (Feature Layer 4)](#8-social--community-features)
 9. [Arena Experience Enhancements (Feature Layer 5)](#9-arena-experience-enhancements)
-10. [iOS App UI Redesign — Pocket Arena](#10-ios-app-ui-redesign--pocket-arena)
+10. [iOS App UI Redesign — TheArenaClaw](#10-ios-app-ui-redesign--pocket-arena)
 11. [Website Redesign — arenaclawfights.com](#11-website-redesign--arenaclawfightscom)
 12. [Website Technical Changes](#12-website-technical-changes)
 13. [Marketing & Growth Strategy](#13-marketing--growth-strategy)
@@ -378,7 +378,7 @@ Without taking a class or reading a tutorial:
 
 ---
 
-## 10. iOS App UI Redesign — Pocket Arena
+## 10. iOS App UI Redesign — TheArenaClaw
 
 ### Design Language
 
@@ -387,14 +387,25 @@ Warm, friendly, collectible-creature inspired. Light cream background, white car
 ### Full design system, screen-by-screen layouts, and implementation phases are documented in:
 **`clawfighter-pocket-arena-implementation-plan.md`**
 
-### Key Structural Changes from Current App
-- Replace `Form` with `ScrollView > VStack` — no more default iOS grouped style
-- White cards on cream background layering
-- Each model becomes its own card with colored letter avatar
-- Evolution view gets a gradient hero card
-- Arena WKWebView gets rounded corner clipping with padding
-- Custom tab bar with creature emoji icons
-- Fighter Card displayed prominently on setup and fight screens
+### Implementation Status (as of March 18, 2026)
+
+**COMPLETED:**
+- Design system foundation: `ClawFighter/Design/DesignSystem.swift` (color tokens, typography, spacing) + `Components.swift` (CardModifier, SectionLabel, StatusBadge)
+- All 5 views restyled: SetupView, FightView, EvolutionView, SavedPromptsView, PromptHistoryView
+- Replaced `Form`/`List` with `ScrollView > VStack` on `.bgCream` backgrounds throughout
+- White cards on cream background layering with `.card()` modifier
+- Each MLX model is its own card with colored letter avatar and status badges (Active/Ready/Get)
+- Evolution view has gradient indigo→purple hero card with generation number, stats, progress bar
+- Arena WKWebView gets rounded corner clipping (cornerRadius 24) with aspect ratio sizing (2:1)
+- WebView CSS injection hides leaderboard, agent panels, controls — only PixiJS canvas visible
+- Custom segmented picker (Move/Fight) with warm background and fireRed active state
+- Full-width "Enter the Arena" CTA button with fireRed background and shadow
+- TabView tinted `.fireRed`
+- FighterCardView integrated on setup and fight screens
+
+**NOT YET DONE:**
+- Custom tab bar with creature emoji icons (using system TabView with `.tint(.fireRed)` for now)
+- Creature selection (no creature sprites yet)
 
 ### Color Tokens
 
@@ -470,6 +481,8 @@ Add `?client=mobile` parameter to the arena/spectator page that strips:
 
 This replaces fragile CSS injection in the iOS WKWebView. The pixel-art arena canvas itself stays untouched.
 
+> **Current status (March 2026):** Not yet implemented server-side. The iOS app currently achieves this via CSS injection in `SpectatorWebView.swift` — injecting `display: none` on `#leaderboard`, `#agent-panels`, `h1`, `#status`, `#controls` after page load. Works but is fragile if the website HTML structure changes. Server-side `?client=mobile` is the cleaner long-term solution.
+
 ### Priority 2: Arena Theme Parameter
 Add `?arena=tijuana` parameter (only value for now). When `?arena=alaska` etc. are added later, the plumbing exists. Each arena value loads different:
 - Background art / tileset
@@ -533,15 +546,15 @@ Each feature/arena launch is a content event:
 
 These create the minimum viable loop: identity → competition → sharing.
 
-1. **Fighter Card with avatar + name** — identity. Without this, nothing is screenshottable or shareable.
+1. **Fighter Card with avatar + name** — identity. Without this, nothing is screenshottable or shareable. ✅ *FighterCardView implemented (setup + fight screens), shows name, W/L, streak, title*
 2. **5 base creature sprites** (pixel art, 64x64) — The Claw, The Ink, The Spark, The Maul, The Talon.
 3. **Creature selection in setup screen** — choose your creature before connecting.
-4. **Win/loss tracking with auto-generated titles** — gives users something to discover and brag about.
+4. **Win/loss tracking with auto-generated titles** — gives users something to discover and brag about. ✅ *Win/loss tracked, auto-titles implemented*
 5. **Shareable results card** — one-tap image generation after fights. Organic growth engine.
 6. **Pre-fight VS splash screen** — transforms "starting a connection" into "entering a match."
 7. **Basic voice coaching (Tier 1)** — microphone button, speech-to-text, inject into LLM context. Even rough, "I can talk to my AI fighter" is an incredible hook.
 8. **Website homepage update** — player-first language, arena preview, creature roster, iPhone app CTA.
-9. **`?client=mobile` server parameter** — clean WKWebView without CSS injection hacks.
+9. **`?client=mobile` server parameter** — clean WKWebView without CSS injection hacks. ⚡ *Workaround in place via iOS CSS injection; server-side not yet implemented*
 10. **Arena picker UI (1 active, 4 locked)** — signals the world is bigger than what's visible now.
 
 ### Phase 2: Retention (Build After First Users)
@@ -551,7 +564,7 @@ These create the minimum viable loop: identity → competition → sharing.
 13. Weekly challenges
 14. Rivalry tracking
 15. Coach Effectiveness Score (voice coaching Tier 2)
-16. Pocket Arena UI redesign completion (all screens)
+16. ~~TheArenaClaw UI redesign completion (all screens)~~ ✅ *Completed March 2026 — all 5 screens restyled with design system*
 
 ### Phase 3: Depth (Content Expansion)
 
@@ -638,7 +651,7 @@ The generativity layer is mostly a product/UX challenge, not a technical one.
 ### Visual Design (iOS App)
 
 1. **Never use default Form styling.** Everything is explicit — custom backgrounds, cards, spacing.
-2. **White cards on cream background.** This layering is the core of the Pocket Arena visual identity.
+2. **White cards on cream background.** This layering is the core of the TheArenaClaw visual identity.
 3. **Rounded everything.** CornerRadius 16 on cards, 24 on CTA/hero cards, 12 on segmented controls.
 4. **Monospace for data, rounded for UI.** Server URLs, tick logs, scores, strategy text → monospaced. Labels, titles, buttons → rounded system font.
 5. **Color restraint.** Red for brand/your-agent, green for status/wins, blue for secondary actions, yellow for leaderboard, purple for evolution. Never mix contexts.

@@ -140,6 +140,15 @@ For more information, read the Bun API docs in `node_modules/bun-types/docs/**.m
 - Bun on server: `/root/.bun/bin/bun`
 - Deploy flow: git pull → bun install → bun run build → systemctl restart clawfights
 
-### Companion Repo
-- OpenClaw fighter agent lives at `/Users/jmg/GitHub/openClawFighter` (separate repo)
+### Spectator Page & iOS WebView
+- `/arena` serves static `client/arena.html` — no query parameter handling
+- HTML structure: `#game-container` (PixiJS canvas 800×400), `#leaderboard` (DOM table), `#agent-panels` (DOM logs), `#status`, `#controls`
+- PixiJS renders all in-game visuals (fighters, HP bars, actions, timer, effects); leaderboard & agent logs are DOM/HTML
+- **iOS app** (`/Users/jmg/GitHub/clawFighter_iOS`) loads `/arena` in WKWebView and injects CSS to hide `#leaderboard`, `#agent-panels`, `h1`, `#status`, `#controls` — showing only the game canvas
+- No server-side mobile theme needed currently; CSS injection in the iOS client handles it
+- If server-side theme support is ever added: parse `url.searchParams` in `/arena` route, inject config as `<script>window.__ARENA_CONFIG = {...}</script>`, read in `renderer.ts`
+
+### Companion Repos
+- **ClawFighter iOS**: `/Users/jmg/GitHub/clawFighter_iOS` — Swift/SwiftUI app with on-device MLX LLM, prompt evolution, spectator WebView
+- **OpenClaw fighter agent**: `/Users/jmg/GitHub/openClawFighter` (separate repo)
 - Uses Claude Haiku with 140ms timeout + heuristic fallback for 200ms game ticks
