@@ -33,7 +33,7 @@ export class GameEngine {
   private npc: NpcBot | NpcStationaryBot | null = null;
   private npcMatchId: string | null = null;
   private npcFighterIndex: 0 | 1 = 0;
-  npcType: NpcType = "stationary";
+  npcType: NpcType = "normal";
 
   // Demo mode state
   private npc2: NpcBot | null = null;
