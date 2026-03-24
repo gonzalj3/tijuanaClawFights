@@ -2,7 +2,7 @@
 // Downloads a quantized model via WebLLM and plays using in-browser inference.
 // No heuristic fallback — if LLM isn't ready or inference is slow, ticks are skipped.
 
-const PLAY_AGENT_VERSION = "v11";
+const PLAY_AGENT_VERSION = "v12";
 console.log(`[play-agent] version ${PLAY_AGENT_VERSION}`);
 
 import { checkWebGPUSupport, initEngine, isModelCached, pickAction, type GameState, type Action } from "./browser-llm";
@@ -10,6 +10,12 @@ import {
   generateReflection,
   applyCoaching,
   getAcknowledgment,
+  getCoachingHistory,
+  removeCoachingRule,
+  updateCoachingRule,
+  getBaseRules,
+  setBaseRules,
+  getDefaultBaseRules,
   COACHING_OPTIONS,
   TOURNAMENT_REFLECTIONS,
   TOURNAMENT_SUGGESTED_COACHING,
@@ -80,6 +86,13 @@ const postfightCoachingAck = document.getElementById("postfight-coaching-ack")!;
 const postfightNav = document.getElementById("postfight-nav")!;
 const postfightStreak = document.getElementById("postfight-streak")!;
 
+// ─── Prompt Viewer DOM ────────────────────────────────────────
+const brainBtn = document.getElementById("brain-btn") as HTMLButtonElement;
+const promptViewerStandalone = document.getElementById("prompt-viewer-standalone")!;
+const promptViewerBrain = document.getElementById("prompt-viewer-brain")!;
+const promptViewerCoaching = document.getElementById("prompt-viewer-coaching")!;
+const promptViewerPostfight = document.getElementById("prompt-viewer-postfight")!;
+
 const MAX_LOG_ENTRIES = 150;
 
 function log(cls: string, text: string) {
@@ -92,6 +105,173 @@ function log(cls: string, text: string) {
   }
   agentLog.scrollTop = agentLog.scrollHeight;
 }
+
+// ─── Prompt Viewer (Fighter Brain) ──────────────────────────────
+function renderPromptViewer(container: HTMLElement) {
+  const baseRules = getBaseRules();
+  const defaults = getDefaultBaseRules();
+  const coaching = getCoachingHistory();
+
+  let html = `<div class="prompt-viewer-title">Fighter Brain — Active Rules</div>`;
+
+  // Base rules
+  baseRules.forEach((rule, i) => {
+    html += `
+      <div class="prompt-rule" data-type="base" data-index="${i}">
+        <span class="prompt-rule-num">${i + 1}.</span>
+        <span class="prompt-rule-text base">${escapeHtml(rule)}</span>
+        <div class="prompt-rule-actions">
+          <button class="prompt-rule-btn edit" title="Edit rule" data-type="base" data-index="${i}">&#9998;</button>
+          <button class="prompt-rule-btn delete" title="Reset to default" data-type="base" data-index="${i}">&#8634;</button>
+        </div>
+      </div>`;
+  });
+
+  // Coaching rules
+  coaching.forEach((entry, i) => {
+    const ruleNum = baseRules.length + i + 1;
+    html += `
+      <div class="prompt-rule" data-type="coaching" data-index="${i}">
+        <span class="prompt-rule-num">${ruleNum}.</span>
+        <span class="prompt-rule-text coaching">${escapeHtml(entry.promptFragment)}</span>
+        <div class="prompt-rule-actions">
+          <button class="prompt-rule-btn edit" title="Edit rule" data-type="coaching" data-index="${i}">&#9998;</button>
+          <button class="prompt-rule-btn delete" title="Delete rule" data-type="coaching" data-index="${i}">&times;</button>
+        </div>
+      </div>`;
+  });
+
+  // Add rule button (if coaching slots available)
+  if (coaching.length < 2) {
+    html += `<button class="prompt-add-rule" id="prompt-add-${container.id}">+ Add coaching rule (${2 - coaching.length} slot${coaching.length === 1 ? "" : "s"} open)</button>`;
+  } else {
+    html += `<button class="prompt-add-rule disabled" disabled>All coaching slots full</button>`;
+  }
+
+  container.innerHTML = html;
+
+  // Wire up edit buttons
+  container.querySelectorAll<HTMLButtonElement>(".prompt-rule-btn.edit").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const type = btn.dataset.type!;
+      const idx = parseInt(btn.dataset.index!, 10);
+      const ruleEl = btn.closest(".prompt-rule")!;
+      const textEl = ruleEl.querySelector(".prompt-rule-text")!;
+      const actionsEl = ruleEl.querySelector(".prompt-rule-actions")!;
+      const currentText = type === "base" ? baseRules[idx] : coaching[idx].promptFragment;
+
+      // Replace with inline edit
+      textEl.outerHTML = `<input class="prompt-rule-edit-input" value="${escapeAttr(currentText)}" />`;
+      actionsEl.outerHTML = `
+        <div class="prompt-rule-edit-actions">
+          <button class="prompt-rule-btn save" title="Save">&#10003;</button>
+          <button class="prompt-rule-btn cancel" title="Cancel">&#10007;</button>
+        </div>`;
+
+      const input = ruleEl.querySelector(".prompt-rule-edit-input") as HTMLInputElement;
+      input.focus();
+      input.select();
+
+      const save = () => {
+        const val = input.value.trim();
+        if (!val) return;
+        if (type === "base") {
+          const rules = getBaseRules();
+          rules[idx] = val;
+          setBaseRules(rules);
+        } else {
+          updateCoachingRule(idx, val);
+        }
+        renderPromptViewer(container);
+        refreshAllPromptViewers(container);
+      };
+
+      ruleEl.querySelector(".prompt-rule-btn.save")!.addEventListener("click", save);
+      input.addEventListener("keydown", (e) => { if (e.key === "Enter") save(); });
+      ruleEl.querySelector(".prompt-rule-btn.cancel")!.addEventListener("click", () => {
+        renderPromptViewer(container);
+      });
+    });
+  });
+
+  // Wire up delete/reset buttons
+  container.querySelectorAll<HTMLButtonElement>(".prompt-rule-btn.delete").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const type = btn.dataset.type!;
+      const idx = parseInt(btn.dataset.index!, 10);
+      if (type === "base") {
+        // Reset to default
+        const rules = getBaseRules();
+        rules[idx] = defaults[idx];
+        setBaseRules(rules);
+      } else {
+        removeCoachingRule(idx);
+      }
+      renderPromptViewer(container);
+      refreshAllPromptViewers(container);
+    });
+  });
+
+  // Wire up add button
+  const addBtn = container.querySelector<HTMLButtonElement>(".prompt-add-rule:not(.disabled)");
+  if (addBtn) {
+    addBtn.addEventListener("click", () => {
+      // Replace button with input
+      addBtn.outerHTML = `
+        <div class="prompt-rule" style="border-color:var(--cyan)">
+          <span class="prompt-rule-num">${baseRules.length + coaching.length + 1}.</span>
+          <input class="prompt-rule-edit-input" placeholder="Type a new coaching rule..." id="prompt-new-input-${container.id}" />
+          <div class="prompt-rule-edit-actions">
+            <button class="prompt-rule-btn save" id="prompt-new-save-${container.id}" title="Save">&#10003;</button>
+            <button class="prompt-rule-btn cancel" id="prompt-new-cancel-${container.id}" title="Cancel">&#10007;</button>
+          </div>
+        </div>`;
+      const newInput = container.querySelector(`#prompt-new-input-${container.id}`) as HTMLInputElement;
+      newInput.focus();
+
+      const saveNew = async () => {
+        const val = newInput.value.trim();
+        if (!val) return;
+        await applyCoaching(val, val);
+        renderPromptViewer(container);
+        refreshAllPromptViewers(container);
+      };
+
+      container.querySelector(`#prompt-new-save-${container.id}`)!.addEventListener("click", saveNew);
+      newInput.addEventListener("keydown", (e) => { if (e.key === "Enter") saveNew(); });
+      container.querySelector(`#prompt-new-cancel-${container.id}`)!.addEventListener("click", () => {
+        renderPromptViewer(container);
+      });
+    });
+  }
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function escapeAttr(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// Keep all visible prompt viewers in sync
+function refreshAllPromptViewers(except?: HTMLElement) {
+  const viewers = [promptViewerBrain, promptViewerCoaching, promptViewerPostfight];
+  for (const v of viewers) {
+    if (v !== except && v.innerHTML) {
+      renderPromptViewer(v);
+    }
+  }
+}
+
+// ─── Brain Button Toggle ──────────────────────────────────────
+brainBtn.addEventListener("click", () => {
+  const isVisible = promptViewerStandalone.classList.toggle("visible");
+  brainBtn.classList.toggle("active", isVisible);
+  if (isVisible) {
+    renderPromptViewer(promptViewerBrain);
+  }
+});
 
 // ─── Coach Shout ────────────────────────────────────────────────
 const coachBar = document.getElementById("coach-bar")!;
@@ -869,6 +1049,7 @@ function showCoachingPanel(summary: MatchSummary) {
   const reflection = generateReflection(summary);
   coachingReflection.textContent = reflection;
   log("log-info", `Fighter: "${reflection}"`);
+  renderPromptViewer(promptViewerCoaching);
 
   // Populate coaching option buttons
   coachingOptionsEl.innerHTML = "";
@@ -910,6 +1091,9 @@ async function applyCoachingAndDismiss(advice: string, promptFragment: string) {
     ? `${ack} (Forgot: "${droppedRule}")`
     : ack;
   coachingAck.style.display = "block";
+
+  // Refresh prompt viewer to show new rule
+  renderPromptViewer(promptViewerCoaching);
 
   // Post-match ceremony chain
   await runPostMatchCeremonies(true);
@@ -1018,6 +1202,9 @@ function showRegularPostfightOverlay(summary: MatchSummary) {
   postfightReflection.textContent = reflection;
   log("log-info", `Fighter: "${reflection}"`);
 
+  // Prompt viewer
+  renderPromptViewer(promptViewerPostfight);
+
   // Coaching options — show ALL options (not curated like tournament)
   postfightCoachingOptions.innerHTML = "";
   for (const opt of COACHING_OPTIONS) {
@@ -1079,6 +1266,9 @@ async function applyCoachingAndDismissRegular(advice: string, promptFragment: st
     ? `${ack} (Forgot: "${droppedRule}")`
     : ack;
   postfightCoachingAck.style.display = "block";
+
+  // Refresh prompt viewer to show new rule
+  renderPromptViewer(promptViewerPostfight);
 
   // Run post-match ceremonies (first coaching announcement, naming, spar unlock)
   // Hide coaching label+options section since coaching was applied
@@ -1545,6 +1735,9 @@ function showTournamentCoachingPanel(
   postfightReflection.textContent = reflection;
   log("log-info", `Fighter: "${reflection}"`);
 
+  // Prompt viewer
+  renderPromptViewer(promptViewerPostfight);
+
   // Coaching options
   postfightCoachingOptions.innerHTML = "";
   const suggestedIndices = TOURNAMENT_SUGGESTED_COACHING[rung] || [0, 1];
@@ -1615,6 +1808,9 @@ async function applyCoachingAndDismissTournament(
     ? `${ack} (Forgot: "${droppedRule}")`
     : ack;
   postfightCoachingAck.style.display = "block";
+
+  // Refresh prompt viewer to show new rule
+  renderPromptViewer(promptViewerPostfight);
 }
 
 function renderPostfightNav(

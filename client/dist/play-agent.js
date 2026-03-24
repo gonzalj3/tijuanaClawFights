@@ -20596,6 +20596,25 @@ function generateReflection(summary) {
   const template = pool[Math.floor(Math.random() * pool.length)];
   return fillReflection(template, summary);
 }
+var BASE_RULES_KEY = "clawfights-base-rules";
+var DEFAULT_BASE_RULES = [
+  "If distance > 2: move toward opponent.",
+  "Attacks hit only at distance ≤ 2. punch=10dmg kick=15dmg(2cd) special=25dmg(5cd)."
+];
+function getBaseRules() {
+  try {
+    const raw = localStorage.getItem(BASE_RULES_KEY);
+    if (raw)
+      return JSON.parse(raw);
+  } catch {}
+  return [...DEFAULT_BASE_RULES];
+}
+function setBaseRules(rules) {
+  localStorage.setItem(BASE_RULES_KEY, JSON.stringify(rules));
+}
+function getDefaultBaseRules() {
+  return [...DEFAULT_BASE_RULES];
+}
 var STORAGE_KEY = "clawfights-coaching-history";
 var MAX_COACHING_RULES = 2;
 function getCoachingHistory() {
@@ -20628,11 +20647,23 @@ async function applyCoaching(advice, promptFragment) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
   return droppedRule;
 }
+function removeCoachingRule(index) {
+  const history = getCoachingHistory();
+  if (index >= 0 && index < history.length) {
+    history.splice(index, 1);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+  }
+}
+function updateCoachingRule(index, promptFragment) {
+  const history = getCoachingHistory();
+  if (index >= 0 && index < history.length) {
+    history[index].promptFragment = promptFragment;
+    history[index].advice = promptFragment;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+  }
+}
 function buildDynamicSystemPrompt() {
-  const rules = [
-    "If distance > 2: move toward opponent.",
-    "Attacks hit only at distance ≤ 2. punch=10dmg kick=15dmg(2cd) special=25dmg(5cd)."
-  ];
+  const rules = [...getBaseRules()];
   const history = getCoachingHistory();
   for (const entry of history) {
     rules.push(entry.promptFragment);
@@ -20889,7 +20920,7 @@ Defensive actions (block/jump): ${defensiveActions}`;
 }
 
 // client/play-agent.ts
-var PLAY_AGENT_VERSION = "v11";
+var PLAY_AGENT_VERSION = "v12";
 console.log(`[play-agent] version ${PLAY_AGENT_VERSION}`);
 var statusEl = document.getElementById("status");
 var progressBar = document.getElementById("progress-bar");
@@ -20941,6 +20972,11 @@ var postfightSkip = document.getElementById("postfight-skip");
 var postfightCoachingAck = document.getElementById("postfight-coaching-ack");
 var postfightNav = document.getElementById("postfight-nav");
 var postfightStreak = document.getElementById("postfight-streak");
+var brainBtn = document.getElementById("brain-btn");
+var promptViewerStandalone = document.getElementById("prompt-viewer-standalone");
+var promptViewerBrain = document.getElementById("prompt-viewer-brain");
+var promptViewerCoaching = document.getElementById("prompt-viewer-coaching");
+var promptViewerPostfight = document.getElementById("prompt-viewer-postfight");
 var MAX_LOG_ENTRIES = 150;
 function log2(cls, text) {
   const el = document.createElement("div");
@@ -20952,6 +20988,150 @@ function log2(cls, text) {
   }
   agentLog.scrollTop = agentLog.scrollHeight;
 }
+function renderPromptViewer(container) {
+  const baseRules = getBaseRules();
+  const defaults = getDefaultBaseRules();
+  const coaching = getCoachingHistory();
+  let html = `<div class="prompt-viewer-title">Fighter Brain — Active Rules</div>`;
+  baseRules.forEach((rule, i) => {
+    html += `
+      <div class="prompt-rule" data-type="base" data-index="${i}">
+        <span class="prompt-rule-num">${i + 1}.</span>
+        <span class="prompt-rule-text base">${escapeHtml(rule)}</span>
+        <div class="prompt-rule-actions">
+          <button class="prompt-rule-btn edit" title="Edit rule" data-type="base" data-index="${i}">&#9998;</button>
+          <button class="prompt-rule-btn delete" title="Reset to default" data-type="base" data-index="${i}">&#8634;</button>
+        </div>
+      </div>`;
+  });
+  coaching.forEach((entry, i) => {
+    const ruleNum = baseRules.length + i + 1;
+    html += `
+      <div class="prompt-rule" data-type="coaching" data-index="${i}">
+        <span class="prompt-rule-num">${ruleNum}.</span>
+        <span class="prompt-rule-text coaching">${escapeHtml(entry.promptFragment)}</span>
+        <div class="prompt-rule-actions">
+          <button class="prompt-rule-btn edit" title="Edit rule" data-type="coaching" data-index="${i}">&#9998;</button>
+          <button class="prompt-rule-btn delete" title="Delete rule" data-type="coaching" data-index="${i}">&times;</button>
+        </div>
+      </div>`;
+  });
+  if (coaching.length < 2) {
+    html += `<button class="prompt-add-rule" id="prompt-add-${container.id}">+ Add coaching rule (${2 - coaching.length} slot${coaching.length === 1 ? "" : "s"} open)</button>`;
+  } else {
+    html += `<button class="prompt-add-rule disabled" disabled>All coaching slots full</button>`;
+  }
+  container.innerHTML = html;
+  container.querySelectorAll(".prompt-rule-btn.edit").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const type = btn.dataset.type;
+      const idx = parseInt(btn.dataset.index, 10);
+      const ruleEl = btn.closest(".prompt-rule");
+      const textEl = ruleEl.querySelector(".prompt-rule-text");
+      const actionsEl = ruleEl.querySelector(".prompt-rule-actions");
+      const currentText = type === "base" ? baseRules[idx] : coaching[idx].promptFragment;
+      textEl.outerHTML = `<input class="prompt-rule-edit-input" value="${escapeAttr(currentText)}" />`;
+      actionsEl.outerHTML = `
+        <div class="prompt-rule-edit-actions">
+          <button class="prompt-rule-btn save" title="Save">&#10003;</button>
+          <button class="prompt-rule-btn cancel" title="Cancel">&#10007;</button>
+        </div>`;
+      const input = ruleEl.querySelector(".prompt-rule-edit-input");
+      input.focus();
+      input.select();
+      const save = () => {
+        const val = input.value.trim();
+        if (!val)
+          return;
+        if (type === "base") {
+          const rules = getBaseRules();
+          rules[idx] = val;
+          setBaseRules(rules);
+        } else {
+          updateCoachingRule(idx, val);
+        }
+        renderPromptViewer(container);
+        refreshAllPromptViewers(container);
+      };
+      ruleEl.querySelector(".prompt-rule-btn.save").addEventListener("click", save);
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter")
+          save();
+      });
+      ruleEl.querySelector(".prompt-rule-btn.cancel").addEventListener("click", () => {
+        renderPromptViewer(container);
+      });
+    });
+  });
+  container.querySelectorAll(".prompt-rule-btn.delete").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const type = btn.dataset.type;
+      const idx = parseInt(btn.dataset.index, 10);
+      if (type === "base") {
+        const rules = getBaseRules();
+        rules[idx] = defaults[idx];
+        setBaseRules(rules);
+      } else {
+        removeCoachingRule(idx);
+      }
+      renderPromptViewer(container);
+      refreshAllPromptViewers(container);
+    });
+  });
+  const addBtn = container.querySelector(".prompt-add-rule:not(.disabled)");
+  if (addBtn) {
+    addBtn.addEventListener("click", () => {
+      addBtn.outerHTML = `
+        <div class="prompt-rule" style="border-color:var(--cyan)">
+          <span class="prompt-rule-num">${baseRules.length + coaching.length + 1}.</span>
+          <input class="prompt-rule-edit-input" placeholder="Type a new coaching rule..." id="prompt-new-input-${container.id}" />
+          <div class="prompt-rule-edit-actions">
+            <button class="prompt-rule-btn save" id="prompt-new-save-${container.id}" title="Save">&#10003;</button>
+            <button class="prompt-rule-btn cancel" id="prompt-new-cancel-${container.id}" title="Cancel">&#10007;</button>
+          </div>
+        </div>`;
+      const newInput = container.querySelector(`#prompt-new-input-${container.id}`);
+      newInput.focus();
+      const saveNew = async () => {
+        const val = newInput.value.trim();
+        if (!val)
+          return;
+        await applyCoaching(val, val);
+        renderPromptViewer(container);
+        refreshAllPromptViewers(container);
+      };
+      container.querySelector(`#prompt-new-save-${container.id}`).addEventListener("click", saveNew);
+      newInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter")
+          saveNew();
+      });
+      container.querySelector(`#prompt-new-cancel-${container.id}`).addEventListener("click", () => {
+        renderPromptViewer(container);
+      });
+    });
+  }
+}
+function escapeHtml(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function escapeAttr(s) {
+  return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function refreshAllPromptViewers(except) {
+  const viewers = [promptViewerBrain, promptViewerCoaching, promptViewerPostfight];
+  for (const v of viewers) {
+    if (v !== except && v.innerHTML) {
+      renderPromptViewer(v);
+    }
+  }
+}
+brainBtn.addEventListener("click", () => {
+  const isVisible = promptViewerStandalone.classList.toggle("visible");
+  brainBtn.classList.toggle("active", isVisible);
+  if (isVisible) {
+    renderPromptViewer(promptViewerBrain);
+  }
+});
 var coachBar = document.getElementById("coach-bar");
 var shoutButtons = document.querySelectorAll(".shout-btn");
 var coachPopupMale = document.getElementById("coach-popup-male");
@@ -21604,6 +21784,7 @@ function showCoachingPanel(summary) {
   const reflection = generateReflection(summary);
   coachingReflection.textContent = reflection;
   log2("log-info", `Fighter: "${reflection}"`);
+  renderPromptViewer(promptViewerCoaching);
   coachingOptionsEl.innerHTML = "";
   for (const opt of COACHING_OPTIONS) {
     const btn = document.createElement("button");
@@ -21634,6 +21815,7 @@ async function applyCoachingAndDismiss(advice, promptFragment) {
   log2("log-info", `Fighter: "${ack}"`);
   coachingAck.textContent = droppedRule ? `${ack} (Forgot: "${droppedRule}")` : ack;
   coachingAck.style.display = "block";
+  renderPromptViewer(promptViewerCoaching);
   await runPostMatchCeremonies(true);
 }
 async function runPostMatchCeremonies(coached) {
@@ -21715,6 +21897,7 @@ function showRegularPostfightOverlay(summary) {
   const reflection = generateReflection(summary);
   postfightReflection.textContent = reflection;
   log2("log-info", `Fighter: "${reflection}"`);
+  renderPromptViewer(promptViewerPostfight);
   postfightCoachingOptions.innerHTML = "";
   for (const opt of COACHING_OPTIONS) {
     const btn = document.createElement("button");
@@ -21760,6 +21943,7 @@ async function applyCoachingAndDismissRegular(advice, promptFragment) {
   log2("log-info", `Fighter: "${ack}"`);
   postfightCoachingAck.textContent = droppedRule ? `${ack} (Forgot: "${droppedRule}")` : ack;
   postfightCoachingAck.style.display = "block";
+  renderPromptViewer(promptViewerPostfight);
   if (!firstCoachingDone) {
     firstCoachingDone = true;
     localStorage.setItem("clawfights-first-coaching-done", "true");
@@ -22147,6 +22331,7 @@ function showTournamentCoachingPanel(summary, result, rung, state) {
   }
   postfightReflection.textContent = reflection;
   log2("log-info", `Fighter: "${reflection}"`);
+  renderPromptViewer(promptViewerPostfight);
   postfightCoachingOptions.innerHTML = "";
   const suggestedIndices = TOURNAMENT_SUGGESTED_COACHING[rung] || [0, 1];
   for (const idx of suggestedIndices) {
@@ -22196,6 +22381,7 @@ async function applyCoachingAndDismissTournament(advice, promptFragment, result,
   log2("log-info", `Fighter: "${ack}"`);
   postfightCoachingAck.textContent = droppedRule ? `${ack} (Forgot: "${droppedRule}")` : ack;
   postfightCoachingAck.style.display = "block";
+  renderPromptViewer(promptViewerPostfight);
 }
 function renderPostfightNav(result, rung, state) {
   postfightNav.innerHTML = "";

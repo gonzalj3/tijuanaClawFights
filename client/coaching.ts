@@ -139,6 +139,29 @@ export function generateReflection(summary: MatchSummary): string {
   return fillReflection(template, summary);
 }
 
+// ─── Base Rules (localStorage with hardcoded defaults) ──────
+const BASE_RULES_KEY = "clawfights-base-rules";
+const DEFAULT_BASE_RULES = [
+  "If distance > 2: move toward opponent.",
+  "Attacks hit only at distance ≤ 2. punch=10dmg kick=15dmg(2cd) special=25dmg(5cd).",
+];
+
+export function getBaseRules(): string[] {
+  try {
+    const raw = localStorage.getItem(BASE_RULES_KEY);
+    if (raw) return JSON.parse(raw) as string[];
+  } catch {}
+  return [...DEFAULT_BASE_RULES];
+}
+
+export function setBaseRules(rules: string[]): void {
+  localStorage.setItem(BASE_RULES_KEY, JSON.stringify(rules));
+}
+
+export function getDefaultBaseRules(): string[] {
+  return [...DEFAULT_BASE_RULES];
+}
+
 // ─── Coaching Rules (localStorage) ───────────────────────────
 // Max 2 coaching rules at a time (slots 3 & 4 in the prompt).
 // FIFO: newest coaching pushes out the oldest when both slots full.
@@ -188,6 +211,23 @@ export function clearCoachingHistory(): void {
   localStorage.removeItem(STORAGE_KEY);
 }
 
+export function removeCoachingRule(index: number): void {
+  const history = getCoachingHistory();
+  if (index >= 0 && index < history.length) {
+    history.splice(index, 1);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+  }
+}
+
+export function updateCoachingRule(index: number, promptFragment: string): void {
+  const history = getCoachingHistory();
+  if (index >= 0 && index < history.length) {
+    history[index].promptFragment = promptFragment;
+    history[index].advice = promptFragment;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+  }
+}
+
 // ─── Dynamic System Prompt ─────────────────────────────────────
 //
 // Minimal mechanical ruleset for a 0.5B model.
@@ -195,10 +235,7 @@ export function clearCoachingHistory(): void {
 // The model sees a numbered list and picks an action. That's it.
 
 export function buildDynamicSystemPrompt(): string {
-  const rules: string[] = [
-    "If distance > 2: move toward opponent.",
-    "Attacks hit only at distance ≤ 2. punch=10dmg kick=15dmg(2cd) special=25dmg(5cd).",
-  ];
+  const rules: string[] = [...getBaseRules()];
 
   // Add coaching rules (max 2)
   const history = getCoachingHistory();
