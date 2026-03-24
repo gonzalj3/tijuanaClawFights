@@ -75,6 +75,7 @@ const postfightCoachingSend = document.getElementById("postfight-coaching-send")
 const postfightSkip = document.getElementById("postfight-skip")!;
 const postfightCoachingAck = document.getElementById("postfight-coaching-ack")!;
 const postfightNav = document.getElementById("postfight-nav")!;
+const postfightStreak = document.getElementById("postfight-streak")!;
 
 const MAX_LOG_ENTRIES = 150;
 
@@ -254,6 +255,7 @@ let inferring = false;
 let wins = 0;
 let losses = 0;
 let draws = 0;
+let winStreak = 0;
 let lastStateTick = -1;
 let lastStateReceivedAt = 0; // timestamp of most recent game_state (including skipped)
 
@@ -580,7 +582,7 @@ function connectAgent() {
         if (tournamentMode) {
           ws!.send(JSON.stringify({ type: "request_tournament_match", rung: tournamentRung }));
         } else {
-          ws!.send(JSON.stringify({ type: "join_queue" }));
+          ws!.send(JSON.stringify({ type: "join_queue", streak: winStreak }));
         }
         coachBar.classList.add("in-match");
         break;
@@ -764,6 +766,7 @@ function onMatchEnd(msg: any) {
   if (msg.winner === null) {
     draws++;
     result = "draw";
+    winStreak = 0;
     statusEl.textContent = "Draw!";
     log("log-info", `── Draw! ──`);
     setTempTitle("(DRAW) TCF");
@@ -771,6 +774,7 @@ function onMatchEnd(msg: any) {
   } else if (msg.winner === name) {
     wins++;
     result = "win";
+    winStreak++;
     statusEl.textContent = `You won! (${msg.reason})`;
     log("log-info", `── You won! (${msg.reason}) ──`);
     setTempTitle("(WIN!) TCF");
@@ -778,6 +782,7 @@ function onMatchEnd(msg: any) {
   } else {
     losses++;
     result = "loss";
+    winStreak = 0;
     statusEl.textContent = `You lost to ${msg.winner}. (${msg.reason})`;
     log("log-error", `── Lost to ${msg.winner} (${msg.reason}) ──`);
     setTempTitle("(KO) TCF");
@@ -787,7 +792,7 @@ function onMatchEnd(msg: any) {
   matchInfoEl.textContent = "";
   recordEl.textContent = `W: ${wins}  L: ${losses}  D: ${draws}`;
 
-  // Build match summary and show coaching panel
+  // Build match summary and show post-fight overlay (same modal as tournament)
   const summary: MatchSummary = {
     result,
     reason: msg.reason === "ko" ? "ko" : "timeout",
@@ -800,7 +805,7 @@ function onMatchEnd(msg: any) {
     actionsUsed: matchActionsUsed,
   };
 
-  showCoachingPanel(summary);
+  showRegularPostfightOverlay(summary);
 }
 
 // ─── Coaching Panel ─────────────────────────────────────────────
@@ -956,6 +961,158 @@ function dismissCoaching() {
   sparNextBtn.style.display = "none";
 }
 
+// ─── Regular Post-Fight Overlay (same modal as tournament) ──────
+function showRegularPostfightOverlay(summary: MatchSummary) {
+  // Result header
+  const resultText = summary.result === "win" ? "VICTORY" : summary.result === "loss" ? "DEFEAT" : "DRAW";
+  postfightResultLabel.textContent = resultText;
+  postfightResultLabel.className = `postfight-result-label ${summary.result}`;
+  postfightOpponent.textContent = `vs ${summary.opponentName} · ${summary.ticksPlayed} ticks · ${summary.reason.toUpperCase()}`;
+
+  // Streak badge
+  if (winStreak > 0) {
+    postfightStreak.textContent = `Win Streak: ${winStreak}`;
+    postfightStreak.classList.add("visible");
+  } else {
+    postfightStreak.classList.remove("visible");
+  }
+
+  // Stats grid
+  const dmgRatio = summary.damageDealt - summary.damageTaken;
+  const dmgClass = dmgRatio > 0 ? "positive" : dmgRatio < 0 ? "negative" : "";
+  postfightStats.innerHTML = `
+    <div class="postfight-stat"><span class="postfight-stat-label">Damage Dealt</span><span class="postfight-stat-value" style="color:var(--green)">${summary.damageDealt}</span></div>
+    <div class="postfight-stat"><span class="postfight-stat-label">Damage Taken</span><span class="postfight-stat-value" style="color:var(--red)">${summary.damageTaken}</span></div>
+    <div class="postfight-stat"><span class="postfight-stat-label">Net Damage</span><span class="postfight-stat-value" style="color:${dmgClass === 'positive' ? 'var(--green)' : dmgClass === 'negative' ? 'var(--red)' : 'var(--text-1)'}">${dmgRatio > 0 ? "+" : ""}${dmgRatio}</span></div>
+    <div class="postfight-stat"><span class="postfight-stat-label">Final HP</span><span class="postfight-stat-value">${summary.myHp} / ${summary.oppHp}</span></div>
+  `;
+
+  // Action chips
+  const sortedActions = Object.entries(summary.actionsUsed)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4);
+  postfightActionsUsed.innerHTML = sortedActions
+    .map(([action, count]) => `<span class="action-chip">${action} x${count}</span>`)
+    .join("");
+
+  // Reflection
+  const reflection = generateReflection(summary);
+  postfightReflection.textContent = reflection;
+  log("log-info", `Fighter: "${reflection}"`);
+
+  // Coaching options — show ALL options (not curated like tournament)
+  postfightCoachingOptions.innerHTML = "";
+  for (const opt of COACHING_OPTIONS) {
+    const btn = document.createElement("button");
+    btn.className = "coaching-btn";
+    btn.textContent = opt.label;
+    btn.addEventListener("click", () => {
+      applyCoachingAndDismissRegular(opt.advice, opt.promptFragment);
+    });
+    postfightCoachingOptions.appendChild(btn);
+  }
+
+  // Reset coaching state
+  postfightCoachingInput.value = "";
+  postfightCoachingAck.style.display = "none";
+  postfightCoachingLabel.style.display = "";
+  postfightCoachingOptions.style.display = "";
+  postfightCoachingCustom.style.display = "";
+  postfightSkip.style.display = "";
+
+  // Nav buttons
+  renderRegularPostfightNav();
+
+  // Wire up skip
+  postfightSkip.onclick = () => {
+    postfightCoachingLabel.style.display = "none";
+    postfightCoachingOptions.style.display = "none";
+    postfightCoachingCustom.style.display = "none";
+    postfightSkip.style.display = "none";
+  };
+
+  // Wire up custom send
+  postfightCoachingSend.onclick = () => {
+    const text = postfightCoachingInput.value.trim();
+    if (!text) return;
+    applyCoachingAndDismissRegular(text, text);
+  };
+
+  // Show the overlay
+  postfightOverlay.classList.remove("hidden");
+}
+
+async function applyCoachingAndDismissRegular(advice: string, promptFragment: string) {
+  postfightCoachingLabel.style.display = "none";
+  postfightCoachingOptions.style.display = "none";
+  postfightCoachingCustom.style.display = "none";
+  postfightSkip.style.display = "none";
+
+  const droppedRule = await applyCoaching(advice, promptFragment);
+  const ack = getAcknowledgment();
+
+  if (droppedRule) {
+    log("log-info", `Fighter dropped rule: "${droppedRule}"`);
+  }
+  log("log-info", `Fighter learned rule: "${promptFragment}"`);
+  log("log-info", `Fighter: "${ack}"`);
+
+  postfightCoachingAck.textContent = droppedRule
+    ? `${ack} (Forgot: "${droppedRule}")`
+    : ack;
+  postfightCoachingAck.style.display = "block";
+
+  // Run post-match ceremonies (first coaching announcement, naming, spar unlock)
+  // Hide coaching label+options section since coaching was applied
+  if (!firstCoachingDone) {
+    firstCoachingDone = true;
+    localStorage.setItem("clawfights-first-coaching-done", "true");
+  }
+}
+
+function renderRegularPostfightNav() {
+  postfightNav.innerHTML = "";
+
+  // "Keep Fighting" / "Fight Again (Streak: N)" — primary red button
+  const fightBtn2 = document.createElement("button");
+  fightBtn2.className = "postfight-nav-btn primary";
+  fightBtn2.textContent = winStreak > 0 ? `Fight Again (Streak: ${winStreak})` : "Fight Again";
+  fightBtn2.addEventListener("click", () => {
+    postfightOverlay.classList.add("hidden");
+    postfightStreak.classList.remove("visible");
+    resetToAiMode();
+    requeueForFight();
+  });
+  postfightNav.appendChild(fightBtn2);
+
+  // "Tournament" — secondary cyan button
+  const tournBtn = document.createElement("button");
+  tournBtn.className = "postfight-nav-btn primary";
+  tournBtn.style.background = "transparent";
+  tournBtn.style.color = "var(--cyan)";
+  tournBtn.style.border = "2px solid var(--cyan)";
+  tournBtn.style.boxShadow = "0 4px 20px rgba(56,189,248,0.15)";
+  tournBtn.textContent = "Tournament";
+  tournBtn.addEventListener("click", () => {
+    postfightOverlay.classList.add("hidden");
+    postfightStreak.classList.remove("visible");
+    winStreak = 0; // reset streak when switching to tournament
+    showTournamentLadder();
+  });
+  postfightNav.appendChild(tournBtn);
+
+  // "Back to Lobby" — tertiary text button
+  const lobbyBtn = document.createElement("button");
+  lobbyBtn.className = "postfight-nav-btn secondary";
+  lobbyBtn.textContent = "Back to Lobby";
+  lobbyBtn.addEventListener("click", () => {
+    postfightOverlay.classList.add("hidden");
+    postfightStreak.classList.remove("visible");
+    winStreak = 0;
+  });
+  postfightNav.appendChild(lobbyBtn);
+}
+
 // ─── Coaching Event Handlers ────────────────────────────────────
 coachingSend.addEventListener("click", () => {
   const text = coachingInput.value.trim();
@@ -982,11 +1139,11 @@ coachingSkip.addEventListener("click", async () => {
 function requeueForFight() {
   dismissCoaching();
   if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ type: "join_queue" }));
+    ws.send(JSON.stringify({ type: "join_queue", streak: winStreak }));
     statusEl.textContent = "In queue — waiting for opponent...";
     coachBar.classList.add("in-match");
     arenaOverlayText.innerHTML = `Waiting for opponent...<span>Spectating other fights in the meantime</span>`;
-    log("log-info", "── Queued for next fight ──");
+    log("log-info", `── Queued for next fight${winStreak > 0 ? ` (streak: ${winStreak})` : ""} ──`);
   }
 }
 

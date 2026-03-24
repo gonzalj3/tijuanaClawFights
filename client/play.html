@@ -299,6 +299,16 @@
   .postfight-result-label.win { color: var(--green); }
   .postfight-result-label.loss { color: var(--red); }
   .postfight-result-label.draw { color: #f59e0b; }
+  .postfight-streak {
+    display: none;
+    margin-top: 6px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: #f59e0b;
+  }
+  .postfight-streak.visible { display: block; }
+  .postfight-streak .streak-icon { font-size: 16px; }
   .postfight-opponent {
     font-size: 13px;
     color: var(--text-3);
@@ -1228,6 +1238,7 @@
       <div class="tournament-postfight-modal">
         <div class="postfight-result">
           <div class="postfight-result-label" id="postfight-result-label"></div>
+          <div class="postfight-streak" id="postfight-streak"></div>
           <div class="postfight-opponent" id="postfight-opponent"></div>
         </div>
         <div class="postfight-stats" id="postfight-stats"></div>

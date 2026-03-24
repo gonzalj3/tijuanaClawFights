@@ -106,6 +106,8 @@ export function handleAgentMessage(
       }
       // Exit demo mode so the arena is free for real agents
       engine.exitDemoMode();
+      // Track streak for progressive NPC difficulty
+      engine.setAgentStreak(ws.data.agentId, msg.streak ?? 0);
       ws.send(JSON.stringify({ type: "queued" }));
       matchmaker.enqueue(ws.data.agentId, name);
       break;

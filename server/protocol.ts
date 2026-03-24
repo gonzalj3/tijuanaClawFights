@@ -11,7 +11,7 @@ export type Action =
 // ─── Agent → Server Messages ───────────────────────────────────
 export type AgentMessage =
   | { type: "register"; name: string; key: string; playerId?: string }
-  | { type: "join_queue" }
+  | { type: "join_queue"; streak?: number }
   | { type: "leave_queue" }
   | { type: "action"; tick: number; action: Action }
   | { type: "request_tournament_match"; rung: number };

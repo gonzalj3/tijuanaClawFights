@@ -20628,9 +20628,10 @@ async function applyCoaching(advice, promptFragment) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
   return droppedRule;
 }
-function buildDynamicSystemPrompt() {
+function buildDynamicSystemPrompt(approachAction) {
+  const moveRule = approachAction ? `If distance > 2: use ${approachAction} to reach opponent.` : "If distance > 2: move toward opponent.";
   const rules = [
-    "If distance > 2: move toward opponent.",
+    moveRule,
     "Attacks hit only at distance ≤ 2. punch=10dmg kick=15dmg(2cd) special=25dmg(5cd)."
   ];
   const history = getCoachingHistory();
@@ -20816,10 +20817,11 @@ Which rule number should be replaced?`
 async function pickAction(state, coachHint) {
   if (!engine)
     return null;
+  const approach = state.you.x < state.opponent.x ? "move_right" : "move_left";
   try {
     const response = await engine.chat.completions.create({
       messages: [
-        { role: "system", content: buildDynamicSystemPrompt() },
+        { role: "system", content: buildDynamicSystemPrompt(approach) },
         { role: "user", content: buildUserPrompt(state, coachHint) }
       ],
       max_tokens: 10,
@@ -20938,6 +20940,7 @@ var postfightCoachingSend = document.getElementById("postfight-coaching-send");
 var postfightSkip = document.getElementById("postfight-skip");
 var postfightCoachingAck = document.getElementById("postfight-coaching-ack");
 var postfightNav = document.getElementById("postfight-nav");
+var postfightStreak = document.getElementById("postfight-streak");
 var MAX_LOG_ENTRIES = 150;
 function log2(cls, text) {
   const el = document.createElement("div");
@@ -21081,6 +21084,7 @@ var inferring = false;
 var wins = 0;
 var losses = 0;
 var draws = 0;
+var winStreak = 0;
 var lastStateTick = -1;
 var lastStateReceivedAt = 0;
 var matchDamageDealt = 0;
@@ -21373,7 +21377,7 @@ function connectAgent() {
         if (tournamentMode) {
           ws.send(JSON.stringify({ type: "request_tournament_match", rung: tournamentRung }));
         } else {
-          ws.send(JSON.stringify({ type: "join_queue" }));
+          ws.send(JSON.stringify({ type: "join_queue", streak: winStreak }));
         }
         coachBar.classList.add("in-match");
         break;
@@ -21519,6 +21523,7 @@ function onMatchEnd(msg) {
   if (msg.winner === null) {
     draws++;
     result = "draw";
+    winStreak = 0;
     statusEl.textContent = "Draw!";
     log2("log-info", `── Draw! ──`);
     setTempTitle("(DRAW) TCF");
@@ -21526,6 +21531,7 @@ function onMatchEnd(msg) {
   } else if (msg.winner === name) {
     wins++;
     result = "win";
+    winStreak++;
     statusEl.textContent = `You won! (${msg.reason})`;
     log2("log-info", `── You won! (${msg.reason}) ──`);
     setTempTitle("(WIN!) TCF");
@@ -21533,6 +21539,7 @@ function onMatchEnd(msg) {
   } else {
     losses++;
     result = "loss";
+    winStreak = 0;
     statusEl.textContent = `You lost to ${msg.winner}. (${msg.reason})`;
     log2("log-error", `── Lost to ${msg.winner} (${msg.reason}) ──`);
     setTempTitle("(KO) TCF");
@@ -21551,7 +21558,7 @@ function onMatchEnd(msg) {
     damageTaken: matchDamageTaken,
     actionsUsed: matchActionsUsed
   };
-  showCoachingPanel(summary);
+  showRegularPostfightOverlay(summary);
 }
 function renderStatsCard(summary) {
   const isComeback = summary.result === "win" && wasLosingHp && myMinHp <= 30;
@@ -21672,6 +21679,116 @@ function dismissCoaching() {
   fightAgainBtn.style.display = "none";
   sparNextBtn.style.display = "none";
 }
+function showRegularPostfightOverlay(summary) {
+  const resultText = summary.result === "win" ? "VICTORY" : summary.result === "loss" ? "DEFEAT" : "DRAW";
+  postfightResultLabel.textContent = resultText;
+  postfightResultLabel.className = `postfight-result-label ${summary.result}`;
+  postfightOpponent.textContent = `vs ${summary.opponentName} · ${summary.ticksPlayed} ticks · ${summary.reason.toUpperCase()}`;
+  if (winStreak > 0) {
+    postfightStreak.textContent = `Win Streak: ${winStreak}`;
+    postfightStreak.classList.add("visible");
+  } else {
+    postfightStreak.classList.remove("visible");
+  }
+  const dmgRatio = summary.damageDealt - summary.damageTaken;
+  const dmgClass = dmgRatio > 0 ? "positive" : dmgRatio < 0 ? "negative" : "";
+  postfightStats.innerHTML = `
+    <div class="postfight-stat"><span class="postfight-stat-label">Damage Dealt</span><span class="postfight-stat-value" style="color:var(--green)">${summary.damageDealt}</span></div>
+    <div class="postfight-stat"><span class="postfight-stat-label">Damage Taken</span><span class="postfight-stat-value" style="color:var(--red)">${summary.damageTaken}</span></div>
+    <div class="postfight-stat"><span class="postfight-stat-label">Net Damage</span><span class="postfight-stat-value" style="color:${dmgClass === "positive" ? "var(--green)" : dmgClass === "negative" ? "var(--red)" : "var(--text-1)"}">${dmgRatio > 0 ? "+" : ""}${dmgRatio}</span></div>
+    <div class="postfight-stat"><span class="postfight-stat-label">Final HP</span><span class="postfight-stat-value">${summary.myHp} / ${summary.oppHp}</span></div>
+  `;
+  const sortedActions = Object.entries(summary.actionsUsed).sort((a, b) => b[1] - a[1]).slice(0, 4);
+  postfightActionsUsed.innerHTML = sortedActions.map(([action, count]) => `<span class="action-chip">${action} x${count}</span>`).join("");
+  const reflection = generateReflection(summary);
+  postfightReflection.textContent = reflection;
+  log2("log-info", `Fighter: "${reflection}"`);
+  postfightCoachingOptions.innerHTML = "";
+  for (const opt of COACHING_OPTIONS) {
+    const btn = document.createElement("button");
+    btn.className = "coaching-btn";
+    btn.textContent = opt.label;
+    btn.addEventListener("click", () => {
+      applyCoachingAndDismissRegular(opt.advice, opt.promptFragment);
+    });
+    postfightCoachingOptions.appendChild(btn);
+  }
+  postfightCoachingInput.value = "";
+  postfightCoachingAck.style.display = "none";
+  postfightCoachingLabel.style.display = "";
+  postfightCoachingOptions.style.display = "";
+  postfightCoachingCustom.style.display = "";
+  postfightSkip.style.display = "";
+  renderRegularPostfightNav();
+  postfightSkip.onclick = () => {
+    postfightCoachingLabel.style.display = "none";
+    postfightCoachingOptions.style.display = "none";
+    postfightCoachingCustom.style.display = "none";
+    postfightSkip.style.display = "none";
+  };
+  postfightCoachingSend.onclick = () => {
+    const text = postfightCoachingInput.value.trim();
+    if (!text)
+      return;
+    applyCoachingAndDismissRegular(text, text);
+  };
+  postfightOverlay.classList.remove("hidden");
+}
+async function applyCoachingAndDismissRegular(advice, promptFragment) {
+  postfightCoachingLabel.style.display = "none";
+  postfightCoachingOptions.style.display = "none";
+  postfightCoachingCustom.style.display = "none";
+  postfightSkip.style.display = "none";
+  const droppedRule = await applyCoaching(advice, promptFragment);
+  const ack = getAcknowledgment();
+  if (droppedRule) {
+    log2("log-info", `Fighter dropped rule: "${droppedRule}"`);
+  }
+  log2("log-info", `Fighter learned rule: "${promptFragment}"`);
+  log2("log-info", `Fighter: "${ack}"`);
+  postfightCoachingAck.textContent = droppedRule ? `${ack} (Forgot: "${droppedRule}")` : ack;
+  postfightCoachingAck.style.display = "block";
+  if (!firstCoachingDone) {
+    firstCoachingDone = true;
+    localStorage.setItem("clawfights-first-coaching-done", "true");
+  }
+}
+function renderRegularPostfightNav() {
+  postfightNav.innerHTML = "";
+  const fightBtn2 = document.createElement("button");
+  fightBtn2.className = "postfight-nav-btn primary";
+  fightBtn2.textContent = winStreak > 0 ? `Fight Again (Streak: ${winStreak})` : "Fight Again";
+  fightBtn2.addEventListener("click", () => {
+    postfightOverlay.classList.add("hidden");
+    postfightStreak.classList.remove("visible");
+    resetToAiMode();
+    requeueForFight();
+  });
+  postfightNav.appendChild(fightBtn2);
+  const tournBtn = document.createElement("button");
+  tournBtn.className = "postfight-nav-btn primary";
+  tournBtn.style.background = "transparent";
+  tournBtn.style.color = "var(--cyan)";
+  tournBtn.style.border = "2px solid var(--cyan)";
+  tournBtn.style.boxShadow = "0 4px 20px rgba(56,189,248,0.15)";
+  tournBtn.textContent = "Tournament";
+  tournBtn.addEventListener("click", () => {
+    postfightOverlay.classList.add("hidden");
+    postfightStreak.classList.remove("visible");
+    winStreak = 0;
+    showTournamentLadder();
+  });
+  postfightNav.appendChild(tournBtn);
+  const lobbyBtn = document.createElement("button");
+  lobbyBtn.className = "postfight-nav-btn secondary";
+  lobbyBtn.textContent = "Back to Lobby";
+  lobbyBtn.addEventListener("click", () => {
+    postfightOverlay.classList.add("hidden");
+    postfightStreak.classList.remove("visible");
+    winStreak = 0;
+  });
+  postfightNav.appendChild(lobbyBtn);
+}
 coachingSend.addEventListener("click", () => {
   const text = coachingInput.value.trim();
   if (!text)
@@ -21693,11 +21810,11 @@ coachingSkip.addEventListener("click", async () => {
 function requeueForFight() {
   dismissCoaching();
   if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ type: "join_queue" }));
+    ws.send(JSON.stringify({ type: "join_queue", streak: winStreak }));
     statusEl.textContent = "In queue — waiting for opponent...";
     coachBar.classList.add("in-match");
     arenaOverlayText.innerHTML = `Waiting for opponent...<span>Spectating other fights in the meantime</span>`;
-    log2("log-info", "── Queued for next fight ──");
+    log2("log-info", `── Queued for next fight${winStreak > 0 ? ` (streak: ${winStreak})` : ""} ──`);
   }
 }
 fightAgainBtn.addEventListener("click", () => {

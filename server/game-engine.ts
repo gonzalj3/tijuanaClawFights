@@ -41,6 +41,9 @@ export class GameEngine {
   npcType: NpcType = "normal";
   private playersDb: PlayersDb | null = null;
 
+  // Agent streak tracking (for progressive NPC difficulty)
+  private agentStreaks = new Map<string, number>();
+
   // Tournament state
   private tournamentBots = new Map<string, { bot: TournamentBot; fighterIndex: 0 | 1 }>();
   private tournamentMatchCounter = 0;
@@ -54,6 +57,10 @@ export class GameEngine {
 
   setPlayersDb(db: PlayersDb): void {
     this.playersDb = db;
+  }
+
+  setAgentStreak(agentId: string, streak: number): void {
+    this.agentStreaks.set(agentId, streak);
   }
 
   start(): void {
@@ -216,10 +223,28 @@ export class GameEngine {
       sock1.data.fighterIndex = 1;
     }
 
-    // Track NPC match
+    // Track NPC match — scale difficulty based on opponent's streak
     if (this.npc) {
-      if (agent0Id === this.npc.id) this.setNpcMatch(id, 0);
-      else if (agent1Id === this.npc.id) this.setNpcMatch(id, 1);
+      if (agent0Id === this.npc.id || agent1Id === this.npc.id) {
+        const npcIsAgent0 = agent0Id === this.npc.id;
+        const realAgentId = npcIsAgent0 ? agent1Id : agent0Id;
+        const streak = this.agentStreaks.get(realAgentId) ?? 0;
+
+        if (streak > 0 && this.npc instanceof NpcBot) {
+          // Respawn NPC with scaled skipRate for progressive difficulty
+          const skipRate = Math.max(0.15, 0.80 - streak * 0.15);
+          const suffixes = ["", " II", " III", " IV", " V", " VI", " VII", " VIII"];
+          const npcName = `NPC Claw Fighter${suffixes[Math.min(streak, suffixes.length - 1)]}`;
+          this.matchmaker?.dequeue(this.npc.id);
+          this.npc.destroy();
+          this.npc = new NpcBot(npcName, skipRate);
+          console.log(`[NPC] Respawned as "${npcName}" (skipRate=${skipRate.toFixed(2)}) for streak ${streak}`);
+          // Update the match fighter name to reflect the new NPC
+          match.fighters[npcIsAgent0 ? 0 : 1].name = npcName;
+        }
+
+        this.setNpcMatch(id, npcIsAgent0 ? 0 : 1);
+      }
     }
     // Track NPC2 (demo mode) match
     if (this.npc2) {
