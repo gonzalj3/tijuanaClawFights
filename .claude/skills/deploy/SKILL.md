@@ -1,6 +1,6 @@
 ---
 name: deploy
-description: Commit, bump cache version, build, push, and manually deploy to production.
+description: Bump cache versions, build, commit, push, and manually deploy to production.
 disable-model-invocation: true
 ---
 
@@ -10,25 +10,25 @@ Run through these steps in order. Stop and report if any step fails.
 
 ## 1. Bump the cache version number
 
-Find all cache-buster version numbers and increment them:
+Check `git diff --name-only` to see what changed, then bump accordingly:
 
-- `client/play-agent.ts` line with `const PLAY_AGENT_VERSION = "vN"` — increment N
-- `client/play.html` line with `play-agent.js?v=N` — match the same N
-- `client/arena.html` line with `renderer.js?v=N` — increment N (if client/renderer.ts was changed in this diff)
-
-Only bump `renderer.js?v=` if renderer.ts was actually modified. Always bump play-agent version.
+- **Always bump**: `client/play-agent.ts` → `const PLAY_AGENT_VERSION = "vN"` (increment N)
+- **Always bump**: `client/play.html` → `play-agent.js?v=N` (match the same N)
+- **Only if `client/renderer.ts` changed**: `client/arena.html` → `renderer.js?v=N` (increment N)
 
 ## 2. Build
 
 ```bash
-bun run build
+export PATH="$HOME/.bun/bin:$PATH" && bun run build
 ```
 
 Verify the build succeeds with no errors.
 
 ## 3. Commit
 
-Stage all relevant changed files (including the built `client/dist/` output) and create a commit. Follow the repo's existing commit message style (short, imperative). Include the version bump in the commit message.
+Stage all relevant changed files and create a commit. Follow the repo's existing commit message style (short, imperative). Include the version bump in the commit message.
+
+Note: `client/dist/` is gitignored — the server rebuilds on deploy.
 
 ## 4. Push
 
@@ -36,13 +36,19 @@ Stage all relevant changed files (including the built `client/dist/` output) and
 git push origin main
 ```
 
-This triggers the GitHub Actions deploy workflow (`.github/workflows/deploy.yml`) which:
-- SSHs to Hetzner CPX11 at `5.161.180.174`
-- Runs `git pull && bun install && bun run build && systemctl restart clawfights`
+## 5. Manual deploy
 
-## 5. Verify deployment
+SSH to the production server and deploy:
 
-Wait 30 seconds for the deploy workflow to complete, then verify:
+```bash
+ssh root@5.161.180.174 'cd /root/tijuanaClawFights && git pull && /root/.bun/bin/bun install && /root/.bun/bin/bun run build && systemctl restart clawfights'
+```
+
+This runs: git pull → bun install → bun run build → restart systemd service.
+
+## 6. Verify deployment
+
+After the deploy command completes, verify the site is up:
 
 ```bash
 curl -s -o /dev/null -w "%{http_code}" https://tijuanaclawfights.com:3000/play
