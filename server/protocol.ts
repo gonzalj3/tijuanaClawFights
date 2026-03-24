@@ -10,10 +10,11 @@ export type Action =
 
 // ─── Agent → Server Messages ───────────────────────────────────
 export type AgentMessage =
-  | { type: "register"; name: string; key: string }
+  | { type: "register"; name: string; key: string; playerId?: string }
   | { type: "join_queue" }
   | { type: "leave_queue" }
-  | { type: "action"; tick: number; action: Action };
+  | { type: "action"; tick: number; action: Action }
+  | { type: "request_tournament_match"; rung: number };
 
 // ─── Server → Agent Messages ───────────────────────────────────
 export interface FighterState {
@@ -25,13 +26,14 @@ export interface FighterState {
 }
 
 export type ServerAgentMessage =
-  | { type: "registered"; id: string }
+  | { type: "registered"; id: string; player?: { name: string; rating: number; wins: number; losses: number; draws: number; streak: number; bestStreak: number } }
   | { type: "queued" }
   | {
       type: "match_start";
       matchId: string;
       opponent: string;
       yourIndex: 0 | 1;
+      tournament?: { rung: number; title: string; opponentName: string };
     }
   | {
       type: "game_state";
@@ -102,6 +104,14 @@ export type SpectatorMessage =
   | {
       type: "leaderboard";
       entries: LeaderboardEntry[];
+    }
+  | {
+      type: "fighter_speech";
+      matchId: string;
+      fighter: 0 | 1;
+      name: string;
+      text: string;
+      event: string;
     };
 
 // ─── Leaderboard ──────────────────────────────────────────────

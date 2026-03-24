@@ -15,6 +15,7 @@ jobs:
           key: ${{ secrets.HETZNER_SSH_KEY }}
           script: |
             cd /root/tijuanaClawFights
+            git checkout client/dist/ 2>/dev/null || true
             git pull origin main
             /root/.bun/bin/bun install
             mkdir -p data

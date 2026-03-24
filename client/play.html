@@ -74,40 +74,33 @@
   /* ─── Main content ─── */
   #main-content { display: block; }
 
-  .controls {
+  /* ─── Fighter identity bar ─── */
+  .identity-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: 12px;
-    padding: 24px;
+    padding: 14px 20px;
     margin-bottom: 20px;
-  }
-  .controls h2 {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 22px;
-    margin-bottom: 16px;
-  }
-
-  .control-row {
-    display: flex;
-    gap: 12px;
-    align-items: center;
     flex-wrap: wrap;
   }
-
-  .name-input {
-    flex: 1;
-    min-width: 180px;
-    padding: 12px 16px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
+  .identity-name {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
     color: var(--text-1);
-    font-size: 15px;
-    font-family: inherit;
-    outline: none;
+    cursor: pointer;
+    transition: color 0.15s;
   }
-  .name-input:focus { border-color: var(--red); }
-  .name-input::placeholder { color: var(--text-3); }
+  .identity-name:hover { color: var(--red); }
+  .identity-stats {
+    font-family: 'Space Grotesk', monospace;
+    font-size: 13px;
+    color: var(--text-2);
+  }
+  .identity-spacer { flex: 1; }
 
   .fight-btn {
     padding: 12px 32px;
@@ -123,6 +116,321 @@
   }
   .fight-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 28px var(--red-glow); }
   .fight-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .tournament-btn {
+    padding: 12px 24px;
+    background: transparent;
+    color: var(--cyan);
+    border: 2px solid var(--cyan);
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 20px rgba(56,189,248,0.15);
+    transition: transform 0.1s, box-shadow 0.15s, background 0.15s, opacity 0.15s;
+  }
+  .tournament-btn:hover:not(:disabled) { transform: translateY(-1px); background: rgba(56,189,248,0.1); box-shadow: 0 6px 28px rgba(56,189,248,0.25); }
+  .tournament-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ─── Tournament overlay ─── */
+  .tournament-overlay, .tournament-victory-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 150;
+    animation: fadeIn 0.3s ease-out;
+  }
+  .tournament-overlay.hidden, .tournament-victory-overlay.hidden { display: none; }
+  .tournament-modal {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px 32px;
+    max-width: 480px;
+    width: 92%;
+    max-height: 85vh;
+    overflow-y: auto;
+    animation: slideIn 0.3s ease-out;
+  }
+  .tournament-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text-1);
+    text-align: center;
+    margin-bottom: 4px;
+  }
+  .tournament-subtitle {
+    font-size: 13px;
+    color: var(--text-3);
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  .tournament-ladder {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .tournament-rung {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .tournament-rung.current {
+    border-color: var(--red);
+    background: rgba(232,69,60,0.08);
+  }
+  .tournament-rung.completed {
+    border-color: var(--green);
+    opacity: 0.7;
+  }
+  .tournament-rung.locked {
+    opacity: 0.35;
+  }
+  .rung-number {
+    font-family: 'Space Grotesk', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-3);
+    min-width: 24px;
+    text-align: center;
+  }
+  .rung-info {
+    flex: 1;
+  }
+  .rung-name {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-1);
+  }
+  .rung-title {
+    font-size: 12px;
+    color: var(--text-3);
+  }
+  .rung-status {
+    font-size: 18px;
+    min-width: 24px;
+    text-align: center;
+  }
+  .tournament-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 16px;
+  }
+  .tournament-fight-btn {
+    width: 100%;
+    padding: 14px;
+    background: var(--red);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    box-shadow: 0 4px 20px var(--red-glow);
+    transition: transform 0.1s, box-shadow 0.15s;
+  }
+  .tournament-fight-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 28px var(--red-glow); }
+  .tournament-back-btn {
+    width: 100%;
+    padding: 10px;
+    background: none;
+    color: var(--text-3);
+    border: none;
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .tournament-back-btn:hover { color: var(--text-2); }
+  .tournament-victory-modal {
+    background: var(--bg);
+    border: 2px solid #f59e0b;
+    border-radius: 16px;
+    padding: 40px 36px;
+    max-width: 440px;
+    width: 90%;
+    text-align: center;
+    animation: slideIn 0.3s ease-out;
+  }
+
+  /* ─── Tournament Post-Fight Overlay ─── */
+  .tournament-postfight-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 150;
+    animation: fadeIn 0.3s ease-out;
+  }
+  .tournament-postfight-overlay.hidden { display: none; }
+  .tournament-postfight-modal {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px 28px;
+    max-width: 480px;
+    width: 92%;
+    max-height: 90vh;
+    overflow-y: auto;
+    animation: slideIn 0.3s ease-out;
+  }
+  .postfight-result {
+    text-align: center;
+    margin-bottom: 16px;
+  }
+  .postfight-result-label {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 24px;
+    font-weight: 700;
+  }
+  .postfight-result-label.win { color: var(--green); }
+  .postfight-result-label.loss { color: var(--red); }
+  .postfight-result-label.draw { color: #f59e0b; }
+  .postfight-opponent {
+    font-size: 13px;
+    color: var(--text-3);
+    margin-top: 2px;
+  }
+  .postfight-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 14px;
+    padding: 10px 12px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .postfight-stat {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 8px;
+  }
+  .postfight-stat-label { font-size: 12px; color: var(--text-3); }
+  .postfight-stat-value { font-family: 'Space Grotesk', monospace; font-size: 13px; font-weight: 600; }
+  .postfight-actions-used {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 14px;
+  }
+  .postfight-reflection {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 14px;
+    color: var(--cyan);
+    margin-bottom: 14px;
+    line-height: 1.5;
+    padding: 10px 14px;
+    background: rgba(56,189,248,0.08);
+    border-radius: 8px;
+    border-left: 3px solid var(--cyan);
+  }
+  .postfight-coaching-label {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-2);
+    margin-bottom: 8px;
+  }
+  .postfight-coaching-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .postfight-coaching-custom {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .postfight-coaching-ack {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 14px;
+    color: var(--green);
+    padding: 10px 14px;
+    background: rgba(34,197,94,0.08);
+    border-radius: 8px;
+    border-left: 3px solid var(--green);
+    display: none;
+    margin-bottom: 10px;
+    animation: slideIn 0.3s ease-out;
+  }
+  .postfight-skip {
+    font-size: 12px;
+    color: var(--text-3);
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-decoration: underline;
+    font-family: inherit;
+    margin-bottom: 14px;
+    display: block;
+  }
+  .postfight-skip:hover { color: var(--text-2); }
+  .postfight-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 4px;
+    border-top: 1px solid var(--border);
+    padding-top: 14px;
+  }
+  .postfight-nav-btn {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.15s;
+  }
+  .postfight-nav-btn:hover { transform: translateY(-1px); }
+  .postfight-nav-btn.primary {
+    background: var(--red);
+    color: white;
+    box-shadow: 0 4px 20px var(--red-glow);
+  }
+  .postfight-nav-btn.secondary {
+    background: none;
+    color: var(--text-3);
+    padding: 8px;
+    font-size: 13px;
+    font-weight: 400;
+  }
+  .postfight-nav-btn.secondary:hover { color: var(--text-2); }
+  .victory-icon {
+    font-size: 64px;
+    margin-bottom: 16px;
+    line-height: 1;
+  }
+  .tournament-victory-modal h2 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 28px;
+    color: #f59e0b;
+    margin-bottom: 10px;
+  }
+  .tournament-victory-modal p {
+    font-size: 15px;
+    color: var(--text-2);
+    margin-bottom: 24px;
+    line-height: 1.5;
+  }
 
   /* ─── Status area ─── */
   .status-bar {
@@ -271,6 +579,401 @@
     border-top: 6px solid #fff;
   }
 
+  /* ─── Coaching panel ─── */
+  .coaching-panel {
+    margin-top: 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+    display: none;
+    animation: slideIn 0.3s ease-out;
+  }
+  .coaching-panel.visible { display: block; }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .coaching-reflection {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 15px;
+    color: var(--cyan);
+    margin-bottom: 16px;
+    line-height: 1.5;
+    padding: 12px 16px;
+    background: rgba(56,189,248,0.08);
+    border-radius: 8px;
+    border-left: 3px solid var(--cyan);
+  }
+  .coaching-label {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-2);
+    margin-bottom: 10px;
+  }
+  .coaching-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .coaching-btn {
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    background: var(--bg);
+    color: var(--text-1);
+    border: 1px solid var(--border);
+    transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  }
+  .coaching-btn:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--cyan);
+    transform: translateY(-1px);
+  }
+  .coaching-custom {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .coaching-input {
+    flex: 1;
+    padding: 8px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-1);
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+  }
+  .coaching-input:focus { border-color: var(--cyan); }
+  .coaching-input::placeholder { color: var(--text-3); }
+  .coaching-send {
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    background: var(--cyan);
+    color: #000;
+    border: none;
+    transition: opacity 0.15s;
+  }
+  .coaching-send:hover { opacity: 0.8; }
+  .coaching-ack {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 14px;
+    color: var(--green);
+    padding: 10px 16px;
+    background: rgba(34,197,94,0.08);
+    border-radius: 8px;
+    border-left: 3px solid var(--green);
+    display: none;
+    animation: slideIn 0.3s ease-out;
+  }
+  .coaching-ack.visible { display: block; }
+  .coaching-skip {
+    font-size: 12px;
+    color: var(--text-3);
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-decoration: underline;
+    font-family: inherit;
+    margin-top: 4px;
+  }
+  .coaching-skip:hover { color: var(--text-2); }
+  .fight-again-btn {
+    display: none;
+    width: 100%;
+    margin-top: 12px;
+    padding: 12px 24px;
+    background: var(--red);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    box-shadow: 0 4px 20px var(--red-glow);
+    transition: transform 0.1s, box-shadow 0.15s;
+    animation: slideIn 0.3s ease-out;
+  }
+  .fight-again-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 28px var(--red-glow); }
+
+  /* ─── Announcement modal ─── */
+  .announce-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    animation: fadeIn 0.3s ease-out;
+  }
+  .announce-overlay.hidden { display: none; }
+  .announce-modal {
+    background: var(--bg);
+    border-radius: 16px;
+    padding: 32px 36px;
+    max-width: 440px;
+    width: 90%;
+    text-align: center;
+    animation: slideIn 0.3s ease-out;
+  }
+  .announce-icon {
+    font-size: 40px;
+    margin-bottom: 12px;
+    line-height: 1;
+  }
+  .announce-modal h2 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 20px;
+    margin-bottom: 10px;
+    color: var(--text-1);
+  }
+  .announce-body {
+    font-size: 14px;
+    color: var(--text-2);
+    line-height: 1.6;
+    margin-bottom: 20px;
+  }
+  .announce-body em {
+    color: var(--cyan);
+    font-style: italic;
+  }
+  .announce-dismiss {
+    padding: 12px 32px;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    border: none;
+    transition: transform 0.1s, box-shadow 0.15s;
+  }
+  .announce-dismiss:hover { transform: translateY(-1px); }
+  .announce-dismiss.red {
+    background: var(--red);
+    color: white;
+    box-shadow: 0 4px 20px var(--red-glow);
+  }
+  .announce-dismiss.cyan {
+    background: var(--cyan);
+    color: #000;
+    box-shadow: 0 4px 20px rgba(56,189,248,0.2);
+  }
+
+  /* ─── Fighter greeting toast ─── */
+  .greeting-toast {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.95);
+    background: var(--bg);
+    border: 1px solid var(--cyan);
+    border-radius: 12px;
+    padding: 24px 32px;
+    z-index: 200;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s, transform 0.4s;
+    box-shadow: 0 8px 32px rgba(56,189,248,0.2);
+    max-width: 440px;
+    text-align: center;
+  }
+  .greeting-toast.visible {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+    pointer-events: auto;
+  }
+  .greeting-toast-text {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 16px;
+    color: var(--text-1);
+    line-height: 1.6;
+  }
+  .greeting-toast-text strong {
+    color: var(--cyan);
+  }
+  .greeting-toast-text em {
+    color: var(--text-2);
+    font-style: italic;
+  }
+
+
+  /* ─── Stats card ─── */
+  .stats-card {
+    display: none;
+    margin-bottom: 14px;
+    padding: 14px 16px;
+    background: var(--bg);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .stats-card.visible { display: block; }
+  .stats-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .stats-card-result {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+  }
+  .stats-card-result.win { color: var(--green); }
+  .stats-card-result.loss { color: var(--red); }
+  .stats-card-result.draw { color: #f59e0b; }
+  .stats-card-result .comeback-badge {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    background: rgba(232,69,60,0.15);
+    color: var(--red);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .stats-card-time {
+    font-size: 12px;
+    color: var(--text-3);
+    font-family: 'Space Grotesk', monospace;
+  }
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .stat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.02);
+  }
+  .stat-label {
+    font-size: 12px;
+    color: var(--text-3);
+  }
+  .stat-value {
+    font-family: 'Space Grotesk', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-1);
+  }
+  .stat-value.positive { color: var(--green); }
+  .stat-value.negative { color: var(--red); }
+  .stats-actions {
+    margin-top: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .action-chip {
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: 'Space Grotesk', monospace;
+    background: rgba(255,255,255,0.05);
+    color: var(--text-2);
+  }
+
+  /* ─── Naming ceremony modal ─── */
+  .naming-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    animation: fadeIn 0.3s ease-out;
+  }
+  .naming-overlay.hidden { display: none; }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  .naming-modal {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+    max-width: 420px;
+    width: 90%;
+    text-align: center;
+    animation: slideIn 0.3s ease-out;
+  }
+  .naming-modal h2 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 22px;
+    margin-bottom: 8px;
+  }
+  .naming-modal h2 span { color: var(--red); }
+  .naming-subtitle {
+    color: var(--text-2);
+    font-size: 14px;
+    margin-bottom: 24px;
+    line-height: 1.5;
+  }
+  .naming-input {
+    width: 100%;
+    padding: 14px 18px;
+    background: var(--bg-card);
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    color: var(--text-1);
+    font-size: 18px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    text-align: center;
+    outline: none;
+    margin-bottom: 16px;
+    transition: border-color 0.2s;
+  }
+  .naming-input:focus { border-color: var(--red); }
+  .naming-input::placeholder { color: var(--text-3); font-weight: 400; }
+  .naming-confirm {
+    width: 100%;
+    padding: 14px;
+    background: var(--red);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    box-shadow: 0 4px 20px var(--red-glow);
+    transition: transform 0.1s, box-shadow 0.15s;
+  }
+  .naming-confirm:hover { transform: translateY(-1px); box-shadow: 0 6px 28px var(--red-glow); }
+  .naming-confirm:disabled { opacity: 0.4; cursor: not-allowed; }
+  .naming-skip {
+    display: block;
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--text-3);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .naming-skip:hover { color: var(--text-2); }
+
   /* ─── Agent log panel ─── */
   .agent-log-panel {
     margin-top: 16px;
@@ -320,6 +1023,38 @@
   }
   #agent-log .log-info {
     color: var(--cyan);
+  }
+
+
+  /* ─── Keyboard HUD ─── */
+  .keyboard-hud {
+    display: none;
+    margin-top: 10px;
+    padding: 10px 16px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 12px;
+    color: var(--text-3);
+    font-family: 'Space Grotesk', sans-serif;
+  }
+  .keyboard-hud .key-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+  .keyboard-hud .key-row:last-child { margin-bottom: 0; }
+  .keyboard-hud kbd {
+    display: inline-block;
+    padding: 2px 8px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: 'Space Grotesk', monospace;
+    font-size: 11px;
+    color: var(--text-2);
   }
 
   /* ─── Coach bar ─── */
@@ -413,14 +1148,12 @@
 
   <!-- Main play interface -->
   <div id="main-content">
-    <div class="controls">
-      <h2>Fight with Your Browser AI</h2>
-      <div class="control-row">
-        <input type="text" id="agent-name" class="name-input"
-               placeholder="WebClaw-${Math.random().toString(36).slice(2, 6).toUpperCase()}"
-               maxlength="24">
-        <button id="fight-btn" class="fight-btn" disabled>Fight!</button>
-      </div>
+    <div class="identity-bar">
+      <span class="identity-name" id="identity-name" title="Click to rename">—</span>
+      <span class="identity-stats" id="identity-stats"></span>
+      <span class="identity-spacer"></span>
+      <button id="fight-btn" class="fight-btn" disabled>Fight!</button>
+      <button id="tournament-btn" class="tournament-btn" disabled>Tournament</button>
     </div>
 
     <div id="progress-section">
@@ -451,12 +1184,116 @@
       </div>
     </div>
 
+    <!-- Keyboard HUD (spar mode) -->
+    <div class="keyboard-hud" id="keyboard-hud">
+      <div class="key-row">
+        <kbd>←/A</kbd> Move Left
+        <kbd>→/D</kbd> Move Right
+        <kbd>↑/W</kbd> Jump
+      </div>
+      <div class="key-row">
+        <kbd>Z/J</kbd> Punch
+        <kbd>X/K</kbd> Kick
+        <kbd>C/L</kbd> Special
+        <kbd>Space</kbd> Block
+      </div>
+    </div>
+
     <div class="coach-bar" id="coach-bar">
       <span class="coach-label">Shout:</span>
       <button class="shout-btn" data-shout="attack" id="shout-attack">Attack!</button>
       <button class="shout-btn" data-shout="movein" id="shout-movein">Move In!</button>
       <button class="shout-btn" data-shout="retreat" id="shout-retreat">Retreat!</button>
       <button class="shout-btn" data-shout="block" id="shout-block">Block!</button>
+    </div>
+
+    <div class="coaching-panel" id="coaching-panel">
+      <div class="stats-card" id="stats-card"></div>
+      <div class="coaching-reflection" id="coaching-reflection"></div>
+      <div class="coaching-label">Your advice:</div>
+      <div class="coaching-options" id="coaching-options"></div>
+      <div class="coaching-custom">
+        <input type="text" class="coaching-input" id="coaching-input"
+               placeholder="Or type your own strategy..." maxlength="100">
+        <button class="coaching-send" id="coaching-send">Send</button>
+      </div>
+      <button class="coaching-skip" id="coaching-skip">Skip — let them figure it out</button>
+      <div class="coaching-ack" id="coaching-ack"></div>
+      <button class="fight-again-btn" id="fight-again-btn">Fight Again</button>
+      <button class="spar-next-btn" id="spar-next-btn" style="display:none;width:100%;margin-top:8px;padding:12px 24px;background:var(--cyan);color:#000;border:none;border-radius:8px;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;box-shadow:0 4px 20px rgba(56,189,248,0.2);transition:transform 0.1s,box-shadow 0.15s;animation:slideIn 0.3s ease-out">Spar Next Fight</button>
+    </div>
+
+    <!-- Tournament Post-Fight Overlay -->
+    <div class="tournament-postfight-overlay hidden" id="tournament-postfight-overlay">
+      <div class="tournament-postfight-modal">
+        <div class="postfight-result">
+          <div class="postfight-result-label" id="postfight-result-label"></div>
+          <div class="postfight-opponent" id="postfight-opponent"></div>
+        </div>
+        <div class="postfight-stats" id="postfight-stats"></div>
+        <div class="postfight-actions-used" id="postfight-actions-used"></div>
+        <div class="postfight-reflection" id="postfight-reflection"></div>
+        <div class="postfight-coaching-label" id="postfight-coaching-label">Your advice:</div>
+        <div class="postfight-coaching-options" id="postfight-coaching-options"></div>
+        <div class="postfight-coaching-custom" id="postfight-coaching-custom">
+          <input type="text" class="coaching-input" id="postfight-coaching-input"
+                 placeholder="Or type your own strategy..." maxlength="100">
+          <button class="coaching-send" id="postfight-coaching-send">Send</button>
+        </div>
+        <button class="postfight-skip" id="postfight-skip">Skip — let them figure it out</button>
+        <div class="postfight-coaching-ack" id="postfight-coaching-ack"></div>
+        <div class="postfight-nav" id="postfight-nav"></div>
+      </div>
+    </div>
+
+    <!-- Tournament Ladder Overlay -->
+    <div class="tournament-overlay hidden" id="tournament-overlay">
+      <div class="tournament-modal">
+        <h2 class="tournament-title">The Ladder</h2>
+        <p class="tournament-subtitle">Defeat all 9 opponents to become champion</p>
+        <div class="tournament-ladder" id="tournament-ladder"></div>
+        <div class="tournament-actions">
+          <button class="tournament-fight-btn" id="tournament-fight-btn">Fight!</button>
+          <button class="tournament-back-btn" id="tournament-back-btn">Back to Lobby</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tournament Victory Overlay -->
+    <div class="tournament-victory-overlay hidden" id="tournament-victory-overlay">
+      <div class="tournament-victory-modal">
+        <div class="victory-icon">&#127942;</div>
+        <h2>CHAMPION!</h2>
+        <p>You conquered The Ladder! All 9 opponents defeated.</p>
+        <button class="tournament-fight-btn" id="tournament-victory-dismiss">Back to Lobby</button>
+      </div>
+    </div>
+
+    <!-- Announcement Modal -->
+    <div class="announce-overlay hidden" id="announce-overlay">
+      <div class="announce-modal">
+        <div class="announce-icon" id="announce-icon"></div>
+        <h2 id="announce-title"></h2>
+        <div class="announce-body" id="announce-body"></div>
+        <button class="announce-dismiss red" id="announce-dismiss">Got it</button>
+      </div>
+    </div>
+
+    <!-- Fighter Greeting Toast -->
+    <div class="greeting-toast" id="greeting-toast">
+      <div class="greeting-toast-text" id="greeting-toast-text"></div>
+    </div>
+
+    <!-- Naming Ceremony Modal -->
+    <div class="naming-overlay hidden" id="naming-overlay">
+      <div class="naming-modal">
+        <h2 id="naming-title">Name Your <span>Fighter</span></h2>
+        <p class="naming-subtitle" id="naming-subtitle">Every champion needs a name. Choose wisely — this is who you'll be coaching in the arena.</p>
+        <input type="text" class="naming-input" id="naming-input"
+               placeholder="Enter fighter name..." maxlength="20" autocomplete="off">
+        <button class="naming-confirm" id="naming-confirm">Enter the Arena</button>
+        <button class="naming-skip" id="naming-skip">Skip — use a random name</button>
+      </div>
     </div>
 
     <div class="agent-log-panel">
@@ -469,12 +1306,6 @@
   </div>
 </div>
 
-<script>
-  // Set random default name
-  const nameInput = document.getElementById('agent-name');
-  const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
-  nameInput.placeholder = 'WebClaw-' + suffix;
-</script>
-<script type="module" src="/dist/play-agent.js?v=7"></script>
+<script type="module" src="/dist/play-agent.js?v=8"></script>
 </body>
 </html>

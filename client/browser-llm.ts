@@ -2,6 +2,7 @@
 // No heuristic fallback — returns null if inference fails or model isn't ready.
 
 import { CreateMLCEngine, hasModelInCache, type MLCEngine, type InitProgressReport } from "@mlc-ai/web-llm";
+import { buildDynamicSystemPrompt } from "./coaching";
 
 const MODEL_ID = "Qwen2.5-0.5B-Instruct-q4f16_1-MLC";
 
@@ -17,19 +18,8 @@ const VALID_ACTIONS = new Set([
   "punch", "kick", "special", "block", "jump", "move_left", "move_right",
 ]);
 
-const SYSTEM_PROMPT = `You are an aggressive fighting game AI. Pick ONE action per turn.
-
-ACTIONS: punch (10dmg), kick (15dmg, 2cd), special (25dmg, 5cd), block, jump, move_left, move_right
-
-RULES:
-- Attacks only hit at distance ≤ 2
-- If distance > 2: MUST move toward opponent (use "approach" direction in state)
-- If distance ≤ 2: attack! Use special if off cooldown, else kick if off cooldown, else punch
-- Block if low HP and opponent just attacked
-- Be aggressive — close distance and attack constantly
-- If your coach shouts a command, prioritize that action above all else
-
-Respond with ONLY the action name, nothing else.`;
+// System prompt is now dynamic — built from coaching history
+// See coaching.ts for the base prompt + coaching section builder
 
 let engine: MLCEngine | null = null;
 
@@ -65,31 +55,85 @@ export interface GameState {
 }
 
 function buildUserPrompt(state: GameState, coachHint?: string): string {
-  const { you, opponent, tick, timeRemaining } = state;
+  const { you, opponent } = state;
   const dist = Math.abs(you.x - opponent.x);
+  const approach = you.x < opponent.x ? "move_right" : "move_left";
 
   const cds = Object.entries(you.cooldowns)
     .map(([k, v]) => `${k}:${v}`)
     .join(",") || "none";
 
-  const oppCds = Object.entries(opponent.cooldowns)
-    .map(([k, v]) => `${k}:${v}`)
-    .join(",") || "none";
-
-  const approach = you.x < opponent.x ? "move_right" : "move_left";
-
-  let prompt = `T${tick} ${timeRemaining}s left
-Me: hp=${you.hp} Opp: hp=${opponent.hp} Dist: ${dist}
-My cd: [${cds}] Opp last: ${opponent.lastAction ?? "-"}
-Approach: ${approach}
-${dist > 2 ? `Too far to attack — use ${approach}` : "In range — attack!"}`;
-
-  if (coachHint) {
-    prompt += `\nCoach shouts: ${coachHint}`;
+  let prompt: string;
+  if (dist > 2) {
+    prompt = `hp=${you.hp} opp=${opponent.hp} dist=${dist} TOO FAR. Use ${approach}`;
+  } else {
+    prompt = `hp=${you.hp} opp=${opponent.hp} dist=${dist} cd=[${cds}] IN RANGE`;
   }
 
-  prompt += `\nAction?`;
+  if (coachHint) {
+    prompt += ` COACH:${coachHint}`;
+  }
+
   return prompt;
+}
+
+export async function analyzeReplay(replaySummary: string): Promise<string | null> {
+  if (!engine) return null;
+  try {
+    const response = await engine.chat.completions.create({
+      messages: [
+        {
+          role: "system",
+          content: "You analyze fighting game replays. Given match stats, summarize the player's fighting style in 2-3 short sentences. Focus on: preferred range, favorite attacks, aggression level, defensive patterns. Be concise and specific.",
+        },
+        {
+          role: "user",
+          content: `Analyze this fight replay. The Coach fought this match manually.\n\n${replaySummary}\n\nSummarize their fighting style:`,
+        },
+      ],
+      max_tokens: 100,
+      temperature: 0.5,
+    });
+    return response.choices[0]?.message?.content?.trim() ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Given existing coaching rules and a new one, ask the LLM which existing
+ * rule to drop. Returns the 1-based index of the rule to replace, or null
+ * if the LLM can't decide (caller falls back to dropping oldest).
+ */
+export async function chooseRuleToReplace(
+  existingRules: string[],
+  newRule: string
+): Promise<number | null> {
+  if (!engine) return null;
+  try {
+    const numbered = existingRules.map((r, i) => `${i + 1}. ${r}`).join("\n");
+    const response = await engine.chat.completions.create({
+      messages: [
+        {
+          role: "system",
+          content: "You manage a fighter's rulebook. Given existing rules and a new rule, pick which existing rule to REPLACE. Reply with ONLY the number.",
+        },
+        {
+          role: "user",
+          content: `Current rules:\n${numbered}\n\nNew rule: ${newRule}\n\nWhich rule number should be replaced?`,
+        },
+      ],
+      max_tokens: 5,
+      temperature: 0.1,
+    });
+    const raw = response.choices[0]?.message?.content?.trim();
+    if (!raw) return null;
+    const num = parseInt(raw, 10);
+    if (num >= 1 && num <= existingRules.length) return num;
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 export async function pickAction(state: GameState, coachHint?: string): Promise<Action | null> {
@@ -98,7 +142,7 @@ export async function pickAction(state: GameState, coachHint?: string): Promise<
   try {
     const response = await engine.chat.completions.create({
       messages: [
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: buildDynamicSystemPrompt() },
         { role: "user", content: buildUserPrompt(state, coachHint) },
       ],
       max_tokens: 10,

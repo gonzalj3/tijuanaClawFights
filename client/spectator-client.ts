@@ -63,7 +63,16 @@ export type LeaderboardMsg = {
   }>;
 };
 
-export type SpectatorMsg = MatchStateMsg | MatchStartMsg | MatchEndMsg | ArenaStatusMsg | AgentRelayMsg | LeaderboardMsg | { type: "match_list"; matches: any[] };
+export type FighterSpeechMsg = {
+  type: "fighter_speech";
+  matchId: string;
+  fighter: 0 | 1;
+  name: string;
+  text: string;
+  event: string;
+};
+
+export type SpectatorMsg = MatchStateMsg | MatchStartMsg | MatchEndMsg | ArenaStatusMsg | AgentRelayMsg | LeaderboardMsg | FighterSpeechMsg | { type: "match_list"; matches: any[] };
 
 export type SpectatorCallbacks = {
   onMatchState: (msg: MatchStateMsg) => void;
@@ -72,6 +81,7 @@ export type SpectatorCallbacks = {
   onArenaStatus: (msg: ArenaStatusMsg) => void;
   onAgentMsg: (msg: AgentRelayMsg) => void;
   onLeaderboard: (msg: LeaderboardMsg) => void;
+  onFighterSpeech?: (msg: FighterSpeechMsg) => void;
   onConnect: () => void;
   onDisconnect: () => void;
 };
@@ -123,6 +133,9 @@ export function connectSpectator(callbacks: SpectatorCallbacks): SpectatorConnec
           break;
         case "leaderboard":
           callbacks.onLeaderboard(msg);
+          break;
+        case "fighter_speech":
+          callbacks.onFighterSpeech?.(msg);
           break;
       }
     };

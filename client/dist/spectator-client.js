@@ -102,6 +102,9 @@ function connectSpectator(callbacks) {
         case "leaderboard":
           callbacks.onLeaderboard(msg);
           break;
+        case "fighter_speech":
+          callbacks.onFighterSpeech?.(msg);
+          break;
       }
     };
     ws.onclose = () => {

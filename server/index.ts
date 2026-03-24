@@ -1,7 +1,8 @@
 import { GameEngine } from "./game-engine.ts";
 import { Matchmaker } from "./matchmaker.ts";
-import { handleAgentMessage, handleAgentClose, type AgentData } from "./agent-connection.ts";
+import { handleAgentMessage, handleAgentClose, setPlayersDb, type AgentData } from "./agent-connection.ts";
 import type { SpectatorControlMessage } from "./protocol.ts";
+import { createPlayersDb } from "./players.ts";
 import { readFileSync } from "fs";
 import { join } from "path";
 
@@ -10,6 +11,11 @@ const PORT = Number(process.env.PORT) || 3000;
 const engine = new GameEngine();
 const matchmaker = new Matchmaker(engine);
 engine.matchmaker = matchmaker;
+
+// Initialize player persistence
+const playersDb = createPlayersDb();
+setPlayersDb(playersDb);
+engine.setPlayersDb(playersDb);
 
 // Serve static client files
 function serveStatic(path: string): Response {

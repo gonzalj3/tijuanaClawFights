@@ -30352,6 +30352,9 @@ function connectSpectator(callbacks) {
         case "leaderboard":
           callbacks.onLeaderboard(msg);
           break;
+        case "fighter_speech":
+          callbacks.onFighterSpeech?.(msg);
+          break;
       }
     };
     ws.onclose = () => {
@@ -33634,6 +33637,7 @@ var FIGHTER_H = 150;
 var HP_BAR_W = 60;
 var HP_BAR_H = 8;
 var GROUND_Y = CANVAS_H - 50;
+var JUMP_HEIGHT = 45;
 var COLORS = {
   p1: 4491519,
   p2: 16729156,
@@ -33647,6 +33651,8 @@ var currentFighters = null;
 var targetFighters = null;
 var prevFighters = null;
 var interpProgress = 0;
+var jumpProgress = [0, 0];
+var isJumping = [false, false];
 var activeEvents = [];
 var matchActive = false;
 var activeMatchId = null;
@@ -33797,6 +33803,46 @@ async function main() {
     dismissBtn.parentElement.appendChild(npcTypeBtn);
   }
   let currentNpcType = "stationary";
+  const speechBubbleStyle = new TextStyle({
+    fontSize: 13,
+    fill: 16777215,
+    fontFamily: "Courier New",
+    fontWeight: "bold",
+    stroke: { color: 0, width: 3 },
+    wordWrap: true,
+    wordWrapWidth: 160,
+    align: "center"
+  });
+  let activeSpeechBubbles = [];
+  function showSpeechBubble(fighter, message) {
+    activeSpeechBubbles = activeSpeechBubbles.filter((b2) => {
+      if (b2.fighter === fighter) {
+        gameLayer.removeChild(b2.text);
+        gameLayer.removeChild(b2.bg);
+        b2.text.destroy();
+        b2.bg.destroy();
+        return false;
+      }
+      return true;
+    });
+    const t2 = new Text({ text: message, style: speechBubbleStyle });
+    t2.anchor.set(0.5, 1);
+    const bg = new Graphics;
+    const padding = 8;
+    const w2 = t2.width + padding * 2;
+    const h2 = t2.height + padding * 2;
+    bg.roundRect(-w2 / 2, -h2, w2, h2, 6);
+    bg.fill({ color: 0, alpha: 0.7 });
+    gameLayer.addChild(bg);
+    gameLayer.addChild(t2);
+    activeSpeechBubbles.push({
+      text: t2,
+      bg,
+      fighter,
+      age: 0,
+      maxAge: 180
+    });
+  }
   const conn = connectSpectator({
     onConnect() {
       statusEl.textContent = "Connected - waiting for match...";
@@ -33875,6 +33921,13 @@ async function main() {
         const isKo = tgt.hp <= 0;
         const anim = actionToAnim(tgt.lastAction, wasHit, isKo);
         fighters[i2].setState(anim);
+        if (tgt.lastAction === "jump" && !wasHit && !isKo) {
+          isJumping[i2] = true;
+          jumpProgress[i2] = 0;
+        } else {
+          isJumping[i2] = false;
+          jumpProgress[i2] = 0;
+        }
       }
       timerText.text = `${Math.ceil(msg.timeRemaining / 5)}s`;
     },
@@ -33905,6 +33958,11 @@ async function main() {
     },
     onAgentMsg(msg) {
       appendAgentMsg(msg.fighter, msg.direction, msg.msg);
+    },
+    onFighterSpeech(msg) {
+      if (activeMatchId && msg.matchId !== activeMatchId)
+        return;
+      showSpeechBubble(msg.fighter, msg.text);
     },
     onLeaderboard(msg) {
       const tbody = document.getElementById("leaderboard-body");
@@ -33960,11 +34018,18 @@ async function main() {
       const lerpX = curr.x + (tgt.x - curr.x) * interpProgress;
       const x2 = unitToX(lerpX);
       const fSprite = fighters[i2];
+      const fi = i2;
+      let jumpY = 0;
+      if (isJumping[fi]) {
+        jumpProgress[fi] = Math.min(1, jumpProgress[fi] + ticker.deltaTime / 24);
+        jumpY = Math.sin(jumpProgress[fi] * Math.PI) * JUMP_HEIGHT;
+      }
+      const renderY = GROUND_Y - jumpY;
       const justHit = activeEvents.some((e2) => e2.age < 3 && e2.type === "hit" && Math.abs(e2.x - x2) < UNIT_PX);
       if (fSprite.isFallback) {
-        fSprite.drawFallback(x2, GROUND_Y, justHit);
+        fSprite.drawFallback(x2, renderY, justHit);
       } else {
-        fSprite.setPosition(x2, GROUND_Y);
+        fSprite.setPosition(x2, renderY);
         fSprite.setFacing(tgt.x < other.x);
       }
       const bg = i2 === 0 ? hp1Bg : hp2Bg;
@@ -33973,7 +34038,7 @@ async function main() {
       const nameLabel = i2 === 0 ? name1 : name2;
       nameLabel.text = tgt.name;
       nameLabel.x = x2 - nameLabel.width / 2;
-      nameLabel.y = GROUND_Y - FIGHTER_H - 38;
+      nameLabel.y = renderY - FIGHTER_H - 38;
       const actionLabel = i2 === 0 ? action1 : action2;
       actionLabel.text = tgt.lastAction ?? "";
       actionLabel.x = x2 - actionLabel.width / 2;
@@ -33996,6 +34061,31 @@ async function main() {
       t2.alpha = Math.max(0, 1 - e2.age / 40);
       gameLayer.addChild(t2);
       eventTexts.push(t2);
+      return true;
+    });
+    activeSpeechBubbles = activeSpeechBubbles.filter((bubble) => {
+      bubble.age++;
+      if (bubble.age > bubble.maxAge) {
+        gameLayer.removeChild(bubble.text);
+        gameLayer.removeChild(bubble.bg);
+        bubble.text.destroy();
+        bubble.bg.destroy();
+        return false;
+      }
+      if (targetFighters) {
+        const fx = unitToX(targetFighters[bubble.fighter].x);
+        const bubbleY = GROUND_Y - FIGHTER_H - 55;
+        bubble.text.x = fx;
+        bubble.text.y = bubbleY;
+        bubble.bg.x = fx;
+        bubble.bg.y = bubbleY;
+      }
+      const fadeStart = bubble.maxAge - 30;
+      if (bubble.age > fadeStart) {
+        const alpha = 1 - (bubble.age - fadeStart) / 30;
+        bubble.text.alpha = alpha;
+        bubble.bg.alpha = alpha;
+      }
       return true;
     });
     if (announcementTimer > 0) {

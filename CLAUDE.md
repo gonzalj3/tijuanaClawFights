@@ -148,6 +148,14 @@ For more information, read the Bun API docs in `node_modules/bun-types/docs/**.m
 - No server-side mobile theme needed currently; CSS injection in the iOS client handles it
 - If server-side theme support is ever added: parse `url.searchParams` in `/arena` route, inject config as `<script>window.__ARENA_CONFIG = {...}</script>`, read in `renderer.ts`
 
+### gstack (Garry Tan's Claude Code skill pack)
+- Installed at `.claude/skills/gstack/` — provides slash commands for the full dev workflow
+- Available skills: `/plan-ceo-review`, `/plan-eng-review`, `/review`, `/ship`, `/qa`, `/browse`, `/design-consultation`, `/design-review`, `/investigate`, `/retro`, `/office-hours`, `/freeze`, `/unfreeze`, `/careful`, `/document-release`
+- Use `/browse` for all web browsing tasks (opens real Playwright browser)
+- Use `/qa` to QA the site by opening it in a real browser and clicking through
+- Use `/ship` to create a PR with full review + QA cycle
+- Use `/investigate` for systematic root-cause debugging
+
 ### Companion Repos
 - **ClawFighter iOS**: `/Users/jmg/GitHub/clawFighter_iOS` — Swift/SwiftUI app with on-device MLX LLM, prompt evolution, spectator WebView
 - **OpenClaw fighter agent**: `/Users/jmg/GitHub/openClawFighter` (separate repo)

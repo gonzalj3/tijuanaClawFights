@@ -1,6 +1,6 @@
 import { Application, Graphics, Text, TextStyle, Sprite, Container } from "pixi.js";
 import { connectSpectator } from "./spectator-client.ts";
-import type { MatchStateMsg, MatchStartMsg, MatchEndMsg, ArenaStatusMsg, AgentRelayMsg, LeaderboardMsg, FighterState } from "./spectator-client.ts";
+import type { MatchStateMsg, MatchStartMsg, MatchEndMsg, ArenaStatusMsg, AgentRelayMsg, LeaderboardMsg, FighterSpeechMsg, FighterState } from "./spectator-client.ts";
 import { FighterSprite, ScreenShake, loadAllAssets, actionToAnim } from "./sprites.ts";
 import type { LoadedAssets } from "./sprites.ts";
 
@@ -13,6 +13,7 @@ const FIGHTER_H = 150;
 const HP_BAR_W = 60;
 const HP_BAR_H = 8;
 const GROUND_Y = CANVAS_H - 50;
+const JUMP_HEIGHT = 45; // pixels of vertical lift during jump
 
 const COLORS = {
   p1: 0x4488ff,
@@ -29,6 +30,9 @@ let currentFighters: [FighterState, FighterState] | null = null;
 let targetFighters: [FighterState, FighterState] | null = null;
 let prevFighters: [FighterState, FighterState] | null = null;
 let interpProgress = 0;
+// Jump visual state: progress 0→1 over one tick, used for Y-offset arc
+let jumpProgress: [number, number] = [0, 0]; // per fighter
+let isJumping: [boolean, boolean] = [false, false];
 let activeEvents: Array<{ text: string; x: number; y: number; age: number; type: string }> = [];
 let matchActive = false;
 let activeMatchId: string | null = null;
@@ -219,6 +223,61 @@ async function main() {
   }
   let currentNpcType: "normal" | "stationary" = "stationary";
 
+  // Speech bubbles
+  const speechBubbleStyle = new TextStyle({
+    fontSize: 13,
+    fill: 0xffffff,
+    fontFamily: "Courier New",
+    fontWeight: "bold",
+    stroke: { color: 0x000000, width: 3 },
+    wordWrap: true,
+    wordWrapWidth: 160,
+    align: "center",
+  });
+  let activeSpeechBubbles: Array<{
+    text: Text;
+    bg: Graphics;
+    fighter: 0 | 1;
+    age: number;
+    maxAge: number;
+  }> = [];
+
+  function showSpeechBubble(fighter: 0 | 1, message: string) {
+    // Remove any existing bubble for this fighter
+    activeSpeechBubbles = activeSpeechBubbles.filter((b) => {
+      if (b.fighter === fighter) {
+        gameLayer.removeChild(b.text);
+        gameLayer.removeChild(b.bg);
+        b.text.destroy();
+        b.bg.destroy();
+        return false;
+      }
+      return true;
+    });
+
+    const t = new Text({ text: message, style: speechBubbleStyle });
+    t.anchor.set(0.5, 1);
+
+    // Background pill
+    const bg = new Graphics();
+    const padding = 8;
+    const w = t.width + padding * 2;
+    const h = t.height + padding * 2;
+    bg.roundRect(-w / 2, -h, w, h, 6);
+    bg.fill({ color: 0x000000, alpha: 0.7 });
+
+    gameLayer.addChild(bg);
+    gameLayer.addChild(t);
+
+    activeSpeechBubbles.push({
+      text: t,
+      bg,
+      fighter,
+      age: 0,
+      maxAge: 180, // ~3 seconds at 60fps
+    });
+  }
+
   // Connect to server
   const conn = connectSpectator({
     onConnect() {
@@ -315,6 +374,15 @@ async function main() {
         const isKo = tgt.hp <= 0;
         const anim = actionToAnim(tgt.lastAction, wasHit, isKo);
         fighters[i]!.setState(anim);
+
+        // Start jump arc when fighter jumps
+        if (tgt.lastAction === "jump" && !wasHit && !isKo) {
+          isJumping[i as 0 | 1] = true;
+          jumpProgress[i as 0 | 1] = 0;
+        } else {
+          isJumping[i as 0 | 1] = false;
+          jumpProgress[i as 0 | 1] = 0;
+        }
       }
 
       timerText.text = `${Math.ceil(msg.timeRemaining / 5)}s`;
@@ -347,6 +415,10 @@ async function main() {
     },
     onAgentMsg(msg: AgentRelayMsg) {
       appendAgentMsg(msg.fighter, msg.direction, msg.msg);
+    },
+    onFighterSpeech(msg) {
+      if (activeMatchId && msg.matchId !== activeMatchId) return;
+      showSpeechBubble(msg.fighter, msg.text);
     },
     onLeaderboard(msg: LeaderboardMsg) {
       const tbody = document.getElementById("leaderboard-body")!;
@@ -424,6 +496,16 @@ async function main() {
       const x = unitToX(lerpX);
 
       const fSprite = fighters[i]!;
+      const fi = i as 0 | 1;
+
+      // Advance jump arc (sine curve over one tick = ~24 frames)
+      let jumpY = 0;
+      if (isJumping[fi]) {
+        jumpProgress[fi] = Math.min(1, jumpProgress[fi] + ticker.deltaTime / 24);
+        jumpY = Math.sin(jumpProgress[fi] * Math.PI) * JUMP_HEIGHT;
+      }
+
+      const renderY = GROUND_Y - jumpY;
 
       // Check if fighter was just hit
       const justHit = activeEvents.some(
@@ -432,23 +514,23 @@ async function main() {
 
       if (fSprite.isFallback) {
         // Fallback rectangle rendering
-        fSprite.drawFallback(x, GROUND_Y, justHit);
+        fSprite.drawFallback(x, renderY, justHit);
       } else {
         // Sprite rendering
-        fSprite.setPosition(x, GROUND_Y);
+        fSprite.setPosition(x, renderY);
         fSprite.setFacing(tgt.x < other.x); // face toward opponent
       }
 
-      // HP bars
+      // HP bars (stay at ground level)
       const bg = i === 0 ? hp1Bg : hp2Bg;
       const fill = i === 0 ? hp1Fill : hp2Fill;
       drawHpBar(bg, fill, x, tgt.hp);
 
-      // Names
+      // Names (follow the fighter up during jump)
       const nameLabel = i === 0 ? name1 : name2;
       nameLabel.text = tgt.name;
       nameLabel.x = x - nameLabel.width / 2;
-      nameLabel.y = GROUND_Y - FIGHTER_H - 38;
+      nameLabel.y = renderY - FIGHTER_H - 38;
 
       // Action labels
       const actionLabel = i === 0 ? action1 : action2;
@@ -476,6 +558,38 @@ async function main() {
       t.alpha = Math.max(0, 1 - e.age / 40);
       gameLayer.addChild(t);
       eventTexts.push(t);
+      return true;
+    });
+
+    // Update speech bubbles
+    activeSpeechBubbles = activeSpeechBubbles.filter((bubble) => {
+      bubble.age++;
+      if (bubble.age > bubble.maxAge) {
+        gameLayer.removeChild(bubble.text);
+        gameLayer.removeChild(bubble.bg);
+        bubble.text.destroy();
+        bubble.bg.destroy();
+        return false;
+      }
+
+      // Position above the fighter
+      if (targetFighters) {
+        const fx = unitToX(targetFighters[bubble.fighter].x);
+        const bubbleY = GROUND_Y - FIGHTER_H - 55;
+        bubble.text.x = fx;
+        bubble.text.y = bubbleY;
+        bubble.bg.x = fx;
+        bubble.bg.y = bubbleY;
+      }
+
+      // Fade out in last 30 frames
+      const fadeStart = bubble.maxAge - 30;
+      if (bubble.age > fadeStart) {
+        const alpha = 1 - (bubble.age - fadeStart) / 30;
+        bubble.text.alpha = alpha;
+        bubble.bg.alpha = alpha;
+      }
+
       return true;
     });
 

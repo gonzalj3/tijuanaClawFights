@@ -1,8 +1,13 @@
 import { Match } from "./match.ts";
 import { TICK_MS } from "./protocol.ts";
 import { NpcBot, NpcStationaryBot } from "./npc-bot.ts";
+import { createTournamentBot, TOURNAMENT_LADDER, type TournamentBot } from "./tournament-bots.ts";
 import { type Matchmaker, MAX_FIGHTS } from "./matchmaker.ts";
 import { loadStats, saveStats, cleanOldDays, getToday } from "./leaderboard-db.ts";
+import { getPlayerIdForAgent } from "./agent-connection.ts";
+import { getPhrase, type DuringFightEvent } from "./phrases.ts";
+import { parseFighterMemory, updateMemoryAfterMatch, type MatchRecord } from "./fighter-memory.ts";
+import type { PlayersDb } from "./players.ts";
 import type { ServerWebSocket } from "bun";
 import type { SpectatorMessage, LeaderboardEntry, NpcType } from "./protocol.ts";
 
@@ -34,6 +39,11 @@ export class GameEngine {
   private npcMatchId: string | null = null;
   private npcFighterIndex: 0 | 1 = 0;
   npcType: NpcType = "normal";
+  private playersDb: PlayersDb | null = null;
+
+  // Tournament state
+  private tournamentBots = new Map<string, { bot: TournamentBot; fighterIndex: 0 | 1 }>();
+  private tournamentMatchCounter = 0;
 
   // Demo mode state
   private npc2: NpcBot | null = null;
@@ -41,6 +51,10 @@ export class GameEngine {
   private npc2FighterIndex: 0 | 1 = 1;
   private demoTimer: ReturnType<typeof setTimeout> | null = null;
   private demoMode = false;
+
+  setPlayersDb(db: PlayersDb): void {
+    this.playersDb = db;
+  }
 
   start(): void {
     if (this.tickInterval) return;
@@ -72,19 +86,31 @@ export class GameEngine {
     match.onEnd = (m) => {
       const endMsg = m.getEndMessage();
 
-      // Record stats (skip demo fights — don't pollute leaderboard)
+      // Record stats (skip demo fights and tournament matches — don't pollute leaderboard)
       const npcId = this.npc?.id;
       const npc2Id = this.npc2?.id;
       const isDemoFight = (agent0Id === npcId || agent0Id === npc2Id) &&
                           (agent1Id === npcId || agent1Id === npc2Id);
-      if (!isDemoFight) {
-        this.recordMatchResult(name0, name1, endMsg.winner);
+      const isTournament = this.tournamentBots.has(id);
+      if (!isDemoFight && !isTournament) {
+        this.recordMatchResult(name0, name1, endMsg.winner, agent0Id, agent1Id, m);
       }
+
+      // Clean up tournament bot
+      if (isTournament) {
+        const tmData = this.tournamentBots.get(id);
+        if (tmData) tmData.bot.destroy();
+        this.tournamentBots.delete(id);
+      }
+
+      // Between-fight speech bubbles (phrase bank)
+      this.broadcastPostMatchSpeech(m, id, name0, name1);
 
       // Notify agents
       const sock0 = this.agentSockets.get(agent0Id);
       const sock1 = this.agentSockets.get(agent1Id);
       const endPayload = JSON.stringify({ type: "match_end", ...endMsg });
+      console.log(`[Match ${id}] END: winner="${endMsg.winner}" reason="${endMsg.reason}" f0="${name0}"(${m.fighters[0].hp}hp) f1="${name1}"(${m.fighters[1].hp}hp)`);
       sock0?.send(endPayload);
       sock1?.send(endPayload);
 
@@ -148,8 +174,8 @@ export class GameEngine {
         }
       }
 
-      // Auto re-queue or kick agents via matchmaker (skip NPCs — handled above)
-      if (this.matchmaker) {
+      // Auto re-queue or kick agents via matchmaker (skip NPCs and tournament — handled above)
+      if (this.matchmaker && !isTournament) {
         const npcId = this.npc?.id;
         const npc2Id = this.npc2?.id;
         const isNpc0 = agent0Id === npcId || agent0Id === npc2Id;
@@ -213,6 +239,34 @@ export class GameEngine {
     return match;
   }
 
+  createTournamentMatch(agentId: string, agentName: string, rung: number): void {
+    const bot = createTournamentBot(rung);
+    const matchId = `tournament-${++this.tournamentMatchCounter}`;
+    const ladder = TOURNAMENT_LADDER[rung];
+
+    // Agent is always fighter 0, bot is fighter 1
+    const match = this.createMatch(matchId, agentId, bot.id, agentName, bot.name);
+    this.tournamentBots.set(matchId, { bot, fighterIndex: 1 });
+
+    // Send match_start with tournament metadata to the agent
+    const sock = this.agentSockets.get(agentId);
+    if (sock) {
+      sock.send(JSON.stringify({
+        type: "match_start",
+        matchId,
+        opponent: bot.name,
+        yourIndex: 0 as const,
+        tournament: {
+          rung: ladder.rung,
+          title: ladder.title,
+          opponentName: ladder.name,
+        },
+      }));
+    }
+
+    console.log(`[Tournament] Match ${matchId}: ${agentName} vs ${bot.name} (rung ${rung})`);
+  }
+
   private tick(): void {
     for (const [matchId, match] of this.matches) {
       if (match.finished) continue;
@@ -269,6 +323,13 @@ export class GameEngine {
         }
       }
 
+      // Tournament bot tick
+      for (const [tmMatchId, tmData] of this.tournamentBots) {
+        if (tmMatchId === matchId) {
+          tmData.bot.onTick(match, tmData.fighterIndex);
+        }
+      }
+
       // Send state to agents
       for (const [agentId, sock] of this.agentSockets) {
         if (sock.data.matchId === matchId && sock.data.fighterIndex !== undefined) {
@@ -287,6 +348,23 @@ export class GameEngine {
           } catch {
             // Agent disconnected
           }
+        }
+      }
+
+      // Broadcast during-fight speech bubbles
+      for (const speech of match.speechEvents) {
+        const fighterName = match.fighters[speech.fighter].name;
+        const opponentName = match.fighters[speech.fighter === 0 ? 1 : 0].name;
+        const text = getPhrase(speech.event as DuringFightEvent, { opponent: opponentName });
+        if (text) {
+          this.broadcastToSpectators({
+            type: "fighter_speech",
+            matchId,
+            fighter: speech.fighter,
+            name: fighterName,
+            text,
+            event: speech.event,
+          });
         }
       }
 
@@ -315,7 +393,7 @@ export class GameEngine {
     return stats;
   }
 
-  private recordMatchResult(name0: string, name1: string, winner: string | null): void {
+  private recordMatchResult(name0: string, name1: string, winner: string | null, agent0Id?: string, agent1Id?: string, match?: Match): void {
     const stats0 = this.getOrCreateStats(name0);
     const stats1 = this.getOrCreateStats(name1);
     stats0.lastActive = Date.now();
@@ -339,10 +417,112 @@ export class GameEngine {
       stats1.winStreak = 0;
     }
 
-    // Persist to SQLite
+    // Persist to leaderboard SQLite
     const today = getToday();
     saveStats(name0, stats0, today);
     saveStats(name1, stats1, today);
+
+    // Persist to players DB (Elo + persistent stats)
+    if (this.playersDb && agent0Id && agent1Id) {
+      const playerId0 = getPlayerIdForAgent(agent0Id);
+      const playerId1 = getPlayerIdForAgent(agent1Id);
+      if (playerId0 && playerId1) {
+        const winnerId = winner === name0 ? playerId0 : winner === name1 ? playerId1 : null;
+        try {
+          this.playersDb.updateAfterMatch(playerId0, playerId1, winnerId);
+        } catch (e) {
+          console.warn("[Players] Failed to update match result:", e);
+        }
+
+        // Update fighter memory with match stats
+        if (match) {
+          try {
+            const result0: "win" | "loss" | "draw" = winner === name0 ? "win" : winner === name1 ? "loss" : "draw";
+            const result1: "win" | "loss" | "draw" = winner === name1 ? "win" : winner === name0 ? "loss" : "draw";
+
+            const matchRecord0: MatchRecord = {
+              opponentId: playerId1,
+              opponentName: name1,
+              result: result0,
+              damageDealt: match.damageDealt[0],
+              damageTaken: match.damageDealt[1],
+              actionsUsed: match.actionCounts[0],
+              myMinHp: match.minHp[0],
+              ticksPlayed: match.tick,
+            };
+            const matchRecord1: MatchRecord = {
+              opponentId: playerId0,
+              opponentName: name0,
+              result: result1,
+              damageDealt: match.damageDealt[1],
+              damageTaken: match.damageDealt[0],
+              actionsUsed: match.actionCounts[1],
+              myMinHp: match.minHp[1],
+              ticksPlayed: match.tick,
+            };
+
+            const mem0 = parseFighterMemory(this.playersDb.getMemory(playerId0));
+            const mem1 = parseFighterMemory(this.playersDb.getMemory(playerId1));
+            this.playersDb.setMemory(playerId0, updateMemoryAfterMatch(mem0, matchRecord0));
+            this.playersDb.setMemory(playerId1, updateMemoryAfterMatch(mem1, matchRecord1));
+          } catch (e) {
+            console.warn("[Memory] Failed to update fighter memory:", e);
+          }
+        }
+      }
+    }
+  }
+
+  private broadcastPostMatchSpeech(match: Match, matchId: string, name0: string, name1: string): void {
+    const endMsg = match.getEndMessage();
+    const winner = endMsg.winner;
+    const isKo = endMsg.reason === "ko";
+
+    // Determine event types for each fighter
+    for (const idx of [0, 1] as const) {
+      const name = match.fighters[idx].name;
+      const opponentName = match.fighters[idx === 0 ? 1 : 0].name;
+      const isWinner = winner === name;
+      const isLoser = winner !== null && winner !== name;
+
+      let event: string;
+      if (isWinner && isKo) {
+        event = "win_ko";
+      } else if (isWinner) {
+        event = "win_normal";
+      } else if (isLoser) {
+        event = "loss_normal";
+      } else {
+        continue; // draw — no speech for now
+      }
+
+      // Get signature move from match action counts
+      let sigMove = "claw";
+      const counts = match.actionCounts[idx];
+      let maxCount = 0;
+      for (const [action, count] of Object.entries(counts)) {
+        if (count > maxCount) { maxCount = count; sigMove = action; }
+      }
+
+      const text = getPhrase(event as any, {
+        opponent: opponentName,
+        signature_move: sigMove,
+      });
+
+      if (text) {
+        // Delay speech slightly so it appears after the match end animation
+        setTimeout(() => {
+          this.broadcastToSpectators({
+            type: "fighter_speech",
+            matchId,
+            fighter: idx,
+            name,
+            text,
+            event,
+          });
+        }, 1000);
+      }
+    }
   }
 
   getLeaderboardMessage(): SpectatorMessage {

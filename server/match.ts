@@ -40,6 +40,11 @@ function fighterState(f: Fighter): FighterState {
   };
 }
 
+export interface SpeechEvent {
+  fighter: 0 | 1;
+  event: string; // DuringFightEvent type
+}
+
 export class Match {
   id: string;
   fighters: [Fighter, Fighter];
@@ -48,6 +53,18 @@ export class Match {
   finished = false;
   winner: string | null = null;
   winReason: "ko" | "timeout" = "ko";
+
+  // Per-fighter stats tracking
+  actionCounts: [Record<string, number>, Record<string, number>] = [{}, {}];
+  damageDealt: [number, number] = [0, 0];
+  minHp: [number, number] = [100, 100]; // lowest HP each fighter reached
+
+  // Speech bubble tracking (max 2 per fight)
+  speechCount = 0;
+  speechEvents: SpeechEvent[] = [];
+  private consecutiveHits: [number, number] = [0, 0]; // per-fighter hit streak
+  private hadFirstHit = false;
+  private hpLead: 0 | 1 | null = null; // who was leading in HP
 
   // Callbacks set by the engine
   onEnd?: (match: Match) => void;
@@ -103,6 +120,10 @@ export class Match {
     f0.pendingAction = null;
     f1.pendingAction = null;
 
+    // Track action counts per fighter
+    if (a0) this.actionCounts[0][a0] = (this.actionCounts[0][a0] || 0) + 1;
+    if (a1) this.actionCounts[1][a1] = (this.actionCounts[1][a1] || 0) + 1;
+
     // Apply cooldowns for used actions
     for (const [f, a] of [[f0, a0], [f1, a1]] as [Fighter, Action | null][]) {
       if (a && COOLDOWNS[a]) {
@@ -149,6 +170,73 @@ export class Match {
       }
     } else if (f1Attacking && inRange && f0Jumping) {
       this.events.push({ type: "miss", fighter: 1, text: "MISS!" });
+    }
+
+    // Track damage dealt and min HP
+    for (const evt of this.events) {
+      if (evt.type === "hit") {
+        // The fighter index in a hit event is the ATTACKER
+        const attacker = evt.fighter as 0 | 1;
+        const defender = attacker === 0 ? 1 : 0;
+        // Damage = opponent's HP loss this tick (approx from DAMAGE table)
+        const action = attacker === 0 ? a0 : a1;
+        if (action && DAMAGE[action]) {
+          this.damageDealt[attacker] += DAMAGE[action]!;
+        }
+      }
+    }
+    // Track lowest HP reached
+    if (f0.hp < this.minHp[0]) this.minHp[0] = f0.hp;
+    if (f1.hp < this.minHp[1]) this.minHp[1] = f1.hp;
+
+    // ─── Speech Event Detection (max 2 per fight) ──────────────
+    this.speechEvents = [];
+    if (this.speechCount < 2) {
+      // Track consecutive hits per fighter
+      for (const evt of this.events) {
+        if (evt.type === "hit") {
+          this.consecutiveHits[evt.fighter]++;
+          const other = evt.fighter === 0 ? 1 : 0;
+          this.consecutiveHits[other] = 0;
+        }
+      }
+
+      // First hit of the match
+      if (!this.hadFirstHit && this.events.some(e => e.type === "hit")) {
+        this.hadFirstHit = true;
+        const hitEvt = this.events.find(e => e.type === "hit")!;
+        this.speechEvents.push({ fighter: hitEvt.fighter as 0 | 1, event: "first_hit" });
+        this.speechCount++;
+      }
+      // Big combo (3+ consecutive hits)
+      else if (this.consecutiveHits[0] >= 3) {
+        this.speechEvents.push({ fighter: 0, event: "big_combo" });
+        this.speechCount++;
+        this.consecutiveHits[0] = 0;
+      } else if (this.consecutiveHits[1] >= 3) {
+        this.speechEvents.push({ fighter: 1, event: "big_combo" });
+        this.speechCount++;
+        this.consecutiveHits[1] = 0;
+      }
+      // Low HP (below 20)
+      else if (this.speechCount < 2) {
+        for (const idx of [0, 1] as const) {
+          if (this.fighters[idx].hp > 0 && this.fighters[idx].hp < 20 && this.tick > 5) {
+            this.speechEvents.push({ fighter: idx, event: "low_hp" });
+            this.speechCount++;
+            break;
+          }
+        }
+      }
+      // Comeback: HP lead changed
+      if (this.speechCount < 2) {
+        const currentLeader = f0.hp > f1.hp ? 0 : f1.hp > f0.hp ? 1 : null;
+        if (this.hpLead !== null && currentLeader !== null && currentLeader !== this.hpLead) {
+          this.speechEvents.push({ fighter: currentLeader, event: "comeback" });
+          this.speechCount++;
+        }
+        this.hpLead = currentLeader;
+      }
     }
 
     // Check win conditions

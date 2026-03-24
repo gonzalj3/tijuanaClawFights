@@ -20514,6 +20514,199 @@ class MLCEngine {
   }
 }
 
+// client/coaching.ts
+var COACHING_OPTIONS = [
+  {
+    label: "Be more aggressive",
+    advice: "Attack more often, don't hesitate!",
+    promptFragment: "Always attack when in range. Never block or retreat."
+  },
+  {
+    label: "Play defensive",
+    advice: "Focus on blocking and dodging first.",
+    promptFragment: "Block after every attack. Jump to dodge specials."
+  },
+  {
+    label: "Use more specials",
+    advice: "Save up for special attacks — they deal 25 damage!",
+    promptFragment: "Use special when off cooldown. It does 25 damage."
+  },
+  {
+    label: "Keep your distance",
+    advice: "Stay back and pick your moments to strike.",
+    promptFragment: "After attacking, move away. Only approach to attack."
+  },
+  {
+    label: "Close the gap",
+    advice: "Get in close and stay there — punches are fast!",
+    promptFragment: "Stay close. Use punch repeatedly. Never move away."
+  },
+  {
+    label: "Block when low HP",
+    advice: "When you're hurt, block to survive longer.",
+    promptFragment: "When HP < 30, use block. Survive first, attack second."
+  }
+];
+var LOSS_REFLECTIONS = [
+  "I took {damageTaken} damage and only dealt {damageDealt}. I need a new strategy, Coach.",
+  "That {opponentName} was tough... I couldn't keep up. What should I change?",
+  "I went down in {ticksPlayed} ticks. How do I last longer, Coach?",
+  "I keep using {topAction} but it's not enough. What else should I try?",
+  "They KO'd me with {oppHp} HP left. I need to do more damage. Ideas?"
+];
+var WIN_REFLECTIONS = [
+  "That felt good! {damageDealt} damage dealt. Should I keep this strategy?",
+  "Won with {myHp} HP left. {topAction} worked well — should I lean into it more?",
+  "Took down {opponentName}! But I still took {damageTaken} damage. How can I be cleaner?",
+  "Victory! My {topAction} was key. Want me to mix it up or double down?"
+];
+var DRAW_REFLECTIONS = [
+  "We went the full distance — {ticksPlayed} ticks. I need to finish fights faster. Advice?",
+  "Draw against {opponentName}. I dealt {damageDealt} but couldn't close it out. What should I do differently?",
+  "Timeout! I need more aggression or better positioning. What do you think, Coach?"
+];
+function getTopAction(actionsUsed) {
+  let top = "punch";
+  let max = 0;
+  for (const [action, count] of Object.entries(actionsUsed)) {
+    if (count > max) {
+      max = count;
+      top = action;
+    }
+  }
+  return top;
+}
+function fillReflection(template, summary) {
+  const topAction = getTopAction(summary.actionsUsed);
+  return template.replace("{damageTaken}", String(summary.damageTaken)).replace("{damageDealt}", String(summary.damageDealt)).replace("{opponentName}", summary.opponentName).replace("{ticksPlayed}", String(summary.ticksPlayed)).replace("{topAction}", topAction).replace("{myHp}", String(summary.myHp)).replace("{oppHp}", String(summary.oppHp));
+}
+function generateReflection(summary) {
+  let pool;
+  switch (summary.result) {
+    case "loss":
+      pool = LOSS_REFLECTIONS;
+      break;
+    case "win":
+      pool = WIN_REFLECTIONS;
+      break;
+    case "draw":
+      pool = DRAW_REFLECTIONS;
+      break;
+  }
+  const template = pool[Math.floor(Math.random() * pool.length)];
+  return fillReflection(template, summary);
+}
+var STORAGE_KEY = "clawfights-coaching-history";
+var MAX_COACHING_RULES = 2;
+function getCoachingHistory() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw)
+      return [];
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+async function applyCoaching(advice, promptFragment) {
+  const history = getCoachingHistory();
+  let droppedRule = null;
+  if (history.length >= MAX_COACHING_RULES) {
+    const existingRules = history.map((e) => e.promptFragment);
+    const idx = await chooseRuleToReplace(existingRules, promptFragment);
+    if (idx !== null && idx >= 1 && idx <= history.length) {
+      droppedRule = history[idx - 1].promptFragment;
+      history[idx - 1] = { advice, promptFragment, timestamp: Date.now() };
+    } else {
+      droppedRule = history[0].promptFragment;
+      history.shift();
+      history.push({ advice, promptFragment, timestamp: Date.now() });
+    }
+  } else {
+    history.push({ advice, promptFragment, timestamp: Date.now() });
+  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+  return droppedRule;
+}
+function buildDynamicSystemPrompt() {
+  const rules = [
+    "If distance > 2: move toward opponent.",
+    "Attacks hit only at distance ≤ 2. punch=10dmg kick=15dmg(2cd) special=25dmg(5cd)."
+  ];
+  const history = getCoachingHistory();
+  for (const entry of history) {
+    rules.push(entry.promptFragment);
+  }
+  const numberedRules = rules.map((r, i) => `${i + 1}. ${r}`).join(`
+`);
+  return `Pick ONE action per turn: punch kick special block jump move_left move_right
+
+RULES:
+${numberedRules}
+
+Reply ONLY the action name.`;
+}
+var ACKNOWLEDGMENTS = [
+  "Got it, Coach! I'll try that next time.",
+  "Understood! Let's see how that works.",
+  "On it! Watch me in the next fight.",
+  "Good call, Coach. I'm ready.",
+  "Makes sense. Let's go!",
+  "I'll focus on that. Bring on the next one!"
+];
+function getAcknowledgment() {
+  return ACKNOWLEDGMENTS[Math.floor(Math.random() * ACKNOWLEDGMENTS.length)];
+}
+var TOURNAMENT_REFLECTIONS = {
+  0: {
+    win: ["Easy one, Coach! My claws are warmed up."],
+    loss: ["I... lost to a punching bag? Help me, Coach."]
+  },
+  1: {
+    win: ["That rookie didn't stand a chance! What's next?"],
+    loss: ["Even the rookie got me... I need to learn the basics, Coach."]
+  },
+  2: {
+    win: ["She was fast, but I caught her! Movement is key."],
+    loss: ["She danced circles around me. I need to control the ring better."]
+  },
+  3: {
+    win: ["That brawler hit hard, but I hit harder!"],
+    loss: ["Too much raw power. I need a way to survive that aggression, Coach."]
+  },
+  4: {
+    win: ["Caught the ghost! You can't run forever."],
+    loss: ["He keeps disappearing... How do I pin down a hit-and-run fighter?"]
+  },
+  5: {
+    win: ["Survived the storm! Relentless, but I held my ground."],
+    loss: ["That was non-stop pressure. I couldn't breathe. Help me, Coach."]
+  },
+  6: {
+    win: ["Broke through the wall! Patience pays off."],
+    loss: ["I kept hitting a wall... literally. How do I crack a defensive fighter?"]
+  },
+  7: {
+    win: ["The mirror couldn't keep up with my style! I'm unpredictable."],
+    loss: ["It copied everything I did... and did it better. I need to switch it up."]
+  },
+  8: {
+    win: ["WE DID IT, COACH! THE CHAMPIONSHIP IS OURS!"],
+    loss: ["The champ is on another level. Three phases of pain. What's the plan, Coach?"]
+  }
+};
+var TOURNAMENT_SUGGESTED_COACHING = {
+  0: [0, 4],
+  1: [0, 4],
+  2: [3, 4],
+  3: [1, 5],
+  4: [0, 4],
+  5: [1, 5],
+  6: [0, 2],
+  7: [2, 3],
+  8: [1, 2, 5]
+};
+
 // client/browser-llm.ts
 var MODEL_ID = "Qwen2.5-0.5B-Instruct-q4f16_1-MLC";
 async function isModelCached() {
@@ -20532,19 +20725,6 @@ var VALID_ACTIONS = new Set([
   "move_left",
   "move_right"
 ]);
-var SYSTEM_PROMPT = `You are an aggressive fighting game AI. Pick ONE action per turn.
-
-ACTIONS: punch (10dmg), kick (15dmg, 2cd), special (25dmg, 5cd), block, jump, move_left, move_right
-
-RULES:
-- Attacks only hit at distance ≤ 2
-- If distance > 2: MUST move toward opponent (use "approach" direction in state)
-- If distance ≤ 2: attack! Use special if off cooldown, else kick if off cooldown, else punch
-- Block if low HP and opponent just attacked
-- Be aggressive — close distance and attack constantly
-- If your coach shouts a command, prioritize that action above all else
-
-Respond with ONLY the action name, nothing else.`;
 var engine = null;
 function checkWebGPUSupport() {
   return "gpu" in navigator;
@@ -20555,23 +20735,83 @@ async function initEngine(onProgress) {
   });
 }
 function buildUserPrompt(state, coachHint) {
-  const { you, opponent, tick, timeRemaining } = state;
+  const { you, opponent } = state;
   const dist = Math.abs(you.x - opponent.x);
-  const cds = Object.entries(you.cooldowns).map(([k, v]) => `${k}:${v}`).join(",") || "none";
-  const oppCds = Object.entries(opponent.cooldowns).map(([k, v]) => `${k}:${v}`).join(",") || "none";
   const approach = you.x < opponent.x ? "move_right" : "move_left";
-  let prompt = `T${tick} ${timeRemaining}s left
-Me: hp=${you.hp} Opp: hp=${opponent.hp} Dist: ${dist}
-My cd: [${cds}] Opp last: ${opponent.lastAction ?? "-"}
-Approach: ${approach}
-${dist > 2 ? `Too far to attack — use ${approach}` : "In range — attack!"}`;
-  if (coachHint) {
-    prompt += `
-Coach shouts: ${coachHint}`;
+  const cds = Object.entries(you.cooldowns).map(([k, v]) => `${k}:${v}`).join(",") || "none";
+  let prompt;
+  if (dist > 2) {
+    prompt = `hp=${you.hp} opp=${opponent.hp} dist=${dist} TOO FAR. Use ${approach}`;
+  } else {
+    prompt = `hp=${you.hp} opp=${opponent.hp} dist=${dist} cd=[${cds}] IN RANGE`;
   }
-  prompt += `
-Action?`;
+  if (coachHint) {
+    prompt += ` COACH:${coachHint}`;
+  }
   return prompt;
+}
+async function analyzeReplay(replaySummary) {
+  if (!engine)
+    return null;
+  try {
+    const response = await engine.chat.completions.create({
+      messages: [
+        {
+          role: "system",
+          content: "You analyze fighting game replays. Given match stats, summarize the player's fighting style in 2-3 short sentences. Focus on: preferred range, favorite attacks, aggression level, defensive patterns. Be concise and specific."
+        },
+        {
+          role: "user",
+          content: `Analyze this fight replay. The Coach fought this match manually.
+
+${replaySummary}
+
+Summarize their fighting style:`
+        }
+      ],
+      max_tokens: 100,
+      temperature: 0.5
+    });
+    return response.choices[0]?.message?.content?.trim() ?? null;
+  } catch {
+    return null;
+  }
+}
+async function chooseRuleToReplace(existingRules, newRule) {
+  if (!engine)
+    return null;
+  try {
+    const numbered = existingRules.map((r, i) => `${i + 1}. ${r}`).join(`
+`);
+    const response = await engine.chat.completions.create({
+      messages: [
+        {
+          role: "system",
+          content: "You manage a fighter's rulebook. Given existing rules and a new rule, pick which existing rule to REPLACE. Reply with ONLY the number."
+        },
+        {
+          role: "user",
+          content: `Current rules:
+${numbered}
+
+New rule: ${newRule}
+
+Which rule number should be replaced?`
+        }
+      ],
+      max_tokens: 5,
+      temperature: 0.1
+    });
+    const raw = response.choices[0]?.message?.content?.trim();
+    if (!raw)
+      return null;
+    const num = parseInt(raw, 10);
+    if (num >= 1 && num <= existingRules.length)
+      return num;
+    return null;
+  } catch {
+    return null;
+  }
 }
 async function pickAction(state, coachHint) {
   if (!engine)
@@ -20579,7 +20819,7 @@ async function pickAction(state, coachHint) {
   try {
     const response = await engine.chat.completions.create({
       messages: [
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: buildDynamicSystemPrompt() },
         { role: "user", content: buildUserPrompt(state, coachHint) }
       ],
       max_tokens: 10,
@@ -20599,13 +20839,63 @@ async function pickAction(state, coachHint) {
   }
 }
 
+// client/sparring-log.ts
+var STORAGE_KEY2 = "clawfights-spar-logs";
+var STYLE_KEY = "clawfights-coach-style";
+var MAX_LOGS = 5;
+function getSparLogs() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY2);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+function saveSparLog(log2) {
+  const logs = getSparLogs();
+  logs.push(log2);
+  while (logs.length > MAX_LOGS)
+    logs.shift();
+  localStorage.setItem(STORAGE_KEY2, JSON.stringify(logs));
+}
+function setCoachStyle(style) {
+  localStorage.setItem(STYLE_KEY, style);
+}
+function buildReplaySummary(log2) {
+  const totalActions = {};
+  let closeRangeActions = 0;
+  let farRangeActions = 0;
+  let aggressiveActions = 0;
+  let defensiveActions = 0;
+  for (const entry of log2.actions) {
+    totalActions[entry.action] = (totalActions[entry.action] || 0) + 1;
+    if (entry.distance <= 2)
+      closeRangeActions++;
+    else
+      farRangeActions++;
+    if (["punch", "kick", "special"].includes(entry.action))
+      aggressiveActions++;
+    if (["block", "jump"].includes(entry.action))
+      defensiveActions++;
+  }
+  const sortedActions = Object.entries(totalActions).sort((a, b) => b[1] - a[1]).map(([action, count]) => `${action}: ${count}`).join(", ");
+  return `Match result: ${log2.result}
+Total actions: ${log2.actions.length}
+Action breakdown: ${sortedActions}
+Close range actions (dist ≤ 2): ${closeRangeActions}
+Far range actions (dist > 2): ${farRangeActions}
+Aggressive actions (punch/kick/special): ${aggressiveActions}
+Defensive actions (block/jump): ${defensiveActions}`;
+}
+
 // client/play-agent.ts
 var statusEl = document.getElementById("status");
 var progressBar = document.getElementById("progress-bar");
 var progressText = document.getElementById("progress-text");
 var progressSection = document.getElementById("progress-section");
 var fightBtn = document.getElementById("fight-btn");
-var nameInput = document.getElementById("agent-name");
+var identityNameEl = document.getElementById("identity-name");
+var identityStatsEl = document.getElementById("identity-stats");
 var recordEl = document.getElementById("record");
 var matchInfoEl = document.getElementById("match-info");
 var webgpuError = document.getElementById("webgpu-error");
@@ -20614,6 +20904,40 @@ var agentLog = document.getElementById("agent-log");
 var tickDisplay = document.getElementById("tick-display");
 var arenaOverlay = document.getElementById("arena-overlay");
 var arenaOverlayText = document.getElementById("arena-overlay-text");
+var namingOverlay = document.getElementById("naming-overlay");
+var namingInput = document.getElementById("naming-input");
+var namingConfirm = document.getElementById("naming-confirm");
+var namingSkip = document.getElementById("naming-skip");
+var statsCard = document.getElementById("stats-card");
+var coachingPanel = document.getElementById("coaching-panel");
+var coachingReflection = document.getElementById("coaching-reflection");
+var coachingOptionsEl = document.getElementById("coaching-options");
+var coachingInput = document.getElementById("coaching-input");
+var coachingSend = document.getElementById("coaching-send");
+var coachingSkip = document.getElementById("coaching-skip");
+var coachingAck = document.getElementById("coaching-ack");
+var fightAgainBtn = document.getElementById("fight-again-btn");
+var tournamentBtn = document.getElementById("tournament-btn");
+var tournamentOverlay = document.getElementById("tournament-overlay");
+var tournamentLadderEl = document.getElementById("tournament-ladder");
+var tournamentFightBtn = document.getElementById("tournament-fight-btn");
+var tournamentBackBtn = document.getElementById("tournament-back-btn");
+var tournamentVictoryOverlay = document.getElementById("tournament-victory-overlay");
+var tournamentVictoryDismiss = document.getElementById("tournament-victory-dismiss");
+var postfightOverlay = document.getElementById("tournament-postfight-overlay");
+var postfightResultLabel = document.getElementById("postfight-result-label");
+var postfightOpponent = document.getElementById("postfight-opponent");
+var postfightStats = document.getElementById("postfight-stats");
+var postfightActionsUsed = document.getElementById("postfight-actions-used");
+var postfightReflection = document.getElementById("postfight-reflection");
+var postfightCoachingLabel = document.getElementById("postfight-coaching-label");
+var postfightCoachingOptions = document.getElementById("postfight-coaching-options");
+var postfightCoachingCustom = document.getElementById("postfight-coaching-custom");
+var postfightCoachingInput = document.getElementById("postfight-coaching-input");
+var postfightCoachingSend = document.getElementById("postfight-coaching-send");
+var postfightSkip = document.getElementById("postfight-skip");
+var postfightCoachingAck = document.getElementById("postfight-coaching-ack");
+var postfightNav = document.getElementById("postfight-nav");
 var MAX_LOG_ENTRIES = 150;
 function log2(cls, text) {
   const el = document.createElement("div");
@@ -20669,6 +20993,88 @@ function clearShout() {
   coachPopupMale.classList.remove("visible");
   coachPopupFemale.classList.remove("visible");
 }
+var gameMode = "ai";
+var pendingKeyAction = null;
+var keyboardHud = document.getElementById("keyboard-hud");
+var sparNextBtn = document.getElementById("spar-next-btn");
+var SPAR_UNLOCK_THRESHOLD = 2;
+var matchCount = parseInt(localStorage.getItem("clawfights-match-count") || "0", 10);
+var sparUnlocked = localStorage.getItem("clawfights-spar-unlocked") === "true";
+var firstCoachingDone = localStorage.getItem("clawfights-first-coaching-done") === "true";
+var tournamentMode = false;
+var tournamentRung = 0;
+var TOURNAMENT_STORAGE_KEY = "clawfights-tournament";
+var TOURNAMENT_LADDER = [
+  { rung: 0, name: "Saco de Arena", title: "The Punching Bag" },
+  { rung: 1, name: "El Novato", title: "The Rookie" },
+  { rung: 2, name: "La Bailarina", title: "The Dancer" },
+  { rung: 3, name: "El Matón", title: "The Brawler" },
+  { rung: 4, name: "El Fantasma", title: "The Ghost" },
+  { rung: 5, name: "La Tormenta", title: "The Storm" },
+  { rung: 6, name: "El Muro", title: "The Wall" },
+  { rung: 7, name: "El Espejo", title: "The Mirror" },
+  { rung: 8, name: "El Campeón", title: "The Boss" }
+];
+function loadTournamentState() {
+  try {
+    const raw = localStorage.getItem(TOURNAMENT_STORAGE_KEY);
+    if (raw)
+      return JSON.parse(raw);
+  } catch {}
+  return { currentRung: 0, attempts: {}, completed: false };
+}
+function saveTournamentState(state) {
+  localStorage.setItem(TOURNAMENT_STORAGE_KEY, JSON.stringify(state));
+}
+var sparHumanWs = null;
+var sparLlmWs = null;
+var sparLlmInferring = false;
+function activateSparMode() {
+  gameMode = "spar";
+  coachBar.style.display = "none";
+  keyboardHud.style.display = "block";
+  pendingKeyAction = null;
+  log2("log-info", "Mode: YOU fight via keyboard vs your AI fighter");
+}
+function resetToAiMode() {
+  gameMode = "ai";
+  coachBar.style.display = "";
+  keyboardHud.style.display = "none";
+  pendingKeyAction = null;
+  if (sparHumanWs && sparHumanWs.readyState === WebSocket.OPEN)
+    sparHumanWs.close();
+  if (sparLlmWs && sparLlmWs.readyState === WebSocket.OPEN)
+    sparLlmWs.close();
+  sparHumanWs = null;
+  sparLlmWs = null;
+  sparLlmInferring = false;
+}
+var KEY_ACTION_MAP = {
+  ArrowLeft: "move_left",
+  a: "move_left",
+  ArrowRight: "move_right",
+  d: "move_right",
+  ArrowUp: "jump",
+  w: "jump",
+  z: "punch",
+  j: "punch",
+  x: "kick",
+  k: "kick",
+  c: "special",
+  l: "special",
+  " ": "block"
+};
+document.addEventListener("keydown", (e) => {
+  if (gameMode !== "spar")
+    return;
+  if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)
+    return;
+  const action = KEY_ACTION_MAP[e.key];
+  if (action) {
+    e.preventDefault();
+    pendingKeyAction = action;
+  }
+});
 var ws = null;
 var modelReady = false;
 var inferring = false;
@@ -20677,19 +21083,177 @@ var losses = 0;
 var draws = 0;
 var lastStateTick = -1;
 var lastStateReceivedAt = 0;
-var MIN_RESPONSE_MS = 120;
-var savedName = localStorage.getItem("clawfights-name");
-if (savedName) {
-  nameInput.value = savedName;
+var matchDamageDealt = 0;
+var matchDamageTaken = 0;
+var matchActionsUsed = {};
+var matchTicksPlayed = 0;
+var lastMyHp = 100;
+var lastOppHp = 100;
+var currentOpponent = "";
+var coachingActive = false;
+var myMinHp = 100;
+var wasLosingHp = false;
+var sparMatchActions = [];
+var originalTitle = document.title;
+var titleTimer = null;
+function setTempTitle(title, durationMs = 5000) {
+  document.title = title;
+  if (titleTimer)
+    clearTimeout(titleTimer);
+  titleTimer = setTimeout(() => {
+    document.title = originalTitle;
+  }, durationMs);
 }
-nameInput.addEventListener("change", () => {
-  const val = nameInput.value.trim();
-  if (val) {
-    localStorage.setItem("clawfights-name", val);
-  } else {
-    localStorage.removeItem("clawfights-name");
+var notifPermissionRequested = false;
+function requestNotifPermission() {
+  if (notifPermissionRequested)
+    return;
+  if (!("Notification" in window))
+    return;
+  if (Notification.permission === "default") {
+    Notification.requestPermission();
+  }
+  notifPermissionRequested = true;
+}
+function sendNotification(title, body) {
+  if (!("Notification" in window))
+    return;
+  if (Notification.permission !== "granted")
+    return;
+  if (!document.hidden)
+    return;
+  new Notification(title, { body, icon: "/assets/arena-bg.png" });
+}
+var MIN_RESPONSE_MS = 120;
+function getOrCreatePlayerId() {
+  let id = localStorage.getItem("clawfights-player-id");
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem("clawfights-player-id", id);
+  }
+  return id;
+}
+var playerId = getOrCreatePlayerId();
+var NAME_ADJECTIVES = [
+  "Iron",
+  "Crimson",
+  "Shadow",
+  "Lucky",
+  "Mad",
+  "Golden",
+  "Silent",
+  "Furious",
+  "Rogue",
+  "Savage",
+  "Neon",
+  "Feral",
+  "Phantom",
+  "Wicked",
+  "Blazing",
+  "Rusty",
+  "Toxic",
+  "Mystic",
+  "Bone",
+  "Razor",
+  "Thunder",
+  "Velvet",
+  "Chaos",
+  "Turbo",
+  "Brutal",
+  "Cosmic",
+  "Mighty",
+  "Dark",
+  "Bloody",
+  "Swift",
+  "Steel",
+  "Wild"
+];
+var NAME_NOUNS = [
+  "Claw",
+  "Pincer",
+  "Fang",
+  "Crusher",
+  "Snapper",
+  "Brawler",
+  "Fury",
+  "Storm",
+  "Havoc",
+  "Mantis",
+  "Scorpion",
+  "Viper",
+  "Titan",
+  "Hammer",
+  "Blade",
+  "Ripper",
+  "Lobster",
+  "Bruiser",
+  "Reaper",
+  "Tornado",
+  "Menace",
+  "Demon",
+  "Slasher",
+  "Beast",
+  "Predator",
+  "Wrecker",
+  "Mauler",
+  "Mangler",
+  "Thrasher",
+  "Striker",
+  "Knuckle",
+  "Barrage"
+];
+function generateRandomName() {
+  const adj = NAME_ADJECTIVES[Math.floor(Math.random() * NAME_ADJECTIVES.length)];
+  const noun = NAME_NOUNS[Math.floor(Math.random() * NAME_NOUNS.length)];
+  return `${adj} ${noun}`;
+}
+var fighterName = localStorage.getItem("clawfights-name") || generateRandomName();
+identityNameEl.textContent = fighterName;
+identityNameEl.addEventListener("click", () => {
+  if (ws && ws.readyState === WebSocket.OPEN)
+    return;
+  showNamingCeremony();
+});
+var announceOverlay = document.getElementById("announce-overlay");
+var announceIcon = document.getElementById("announce-icon");
+var announceTitle = document.getElementById("announce-title");
+var announceBody = document.getElementById("announce-body");
+var announceDismiss = document.getElementById("announce-dismiss");
+var announceResolve = null;
+function showAnnouncement(opts) {
+  announceIcon.textContent = opts.icon;
+  announceTitle.textContent = opts.title;
+  announceBody.innerHTML = opts.body;
+  announceDismiss.textContent = opts.buttonText || "Got it";
+  announceDismiss.className = `announce-dismiss ${opts.buttonStyle || "red"}`;
+  announceOverlay.classList.remove("hidden");
+  return new Promise((resolve) => {
+    announceResolve = resolve;
+  });
+}
+announceDismiss.addEventListener("click", () => {
+  announceOverlay.classList.add("hidden");
+  if (announceResolve) {
+    announceResolve();
+    announceResolve = null;
   }
 });
+var POST_COACHING_GREETINGS = [
+  "Thanks, Coach. I feel stronger already.",
+  "Now I know what to do. Let's fight!",
+  "You get me, Coach. Ready for the next one.",
+  "That advice? Perfect. Watch what I do with it.",
+  "I can feel the difference already. Let's go.",
+  "Coach knows best. Time to prove it."
+];
+var SPAR_UNLOCK_PHRASES = [
+  "I've been watching you coach... Show me how YOU fight, Coach.",
+  "You talk a big game, Coach. Time to back it up.",
+  "Coach, I want to see YOUR moves. Fight me.",
+  "Three fights in and I trust you. Now show me your claws."
+];
+var greetingToast = document.getElementById("greeting-toast");
+var greetingToastText = document.getElementById("greeting-toast-text");
 if (!checkWebGPUSupport()) {
   webgpuError.style.display = "block";
   mainContent.style.display = "none";
@@ -20707,13 +21271,59 @@ async function downloadModel() {
     });
     modelReady = true;
     progressSection.style.display = "none";
-    statusEl.textContent = "Model ready! Enter a name and click Fight.";
+    statusEl.textContent = "Model ready! Click Fight to enter the arena.";
     fightBtn.disabled = false;
+    tournamentBtn.disabled = false;
   } catch (err) {
     statusEl.textContent = `Model load failed: ${err}`;
     console.error("WebLLM init failed:", err);
   }
 }
+var namingDone = !!localStorage.getItem("clawfights-name");
+var namingResolve = null;
+var namingTitle = document.getElementById("naming-title");
+var namingSubtitle = document.getElementById("naming-subtitle");
+function showNamingCeremony(postFight = false) {
+  if (postFight) {
+    namingTitle.innerHTML = `Give me a real name, <span>Coach</span>`;
+    namingSubtitle.textContent = "I've proven myself in the arena. Now give me a name worth fighting for.";
+  } else {
+    namingTitle.innerHTML = `Name Your <span>Fighter</span>`;
+    namingSubtitle.textContent = "Every champion needs a name. Choose wisely — this is who you'll be coaching in the arena.";
+  }
+  namingOverlay.classList.remove("hidden");
+  namingInput.value = "";
+  namingInput.focus();
+  return new Promise((resolve) => {
+    namingResolve = resolve;
+  });
+}
+function dismissNaming(name) {
+  namingOverlay.classList.add("hidden");
+  if (name) {
+    fighterName = name;
+    localStorage.setItem("clawfights-name", name);
+  }
+  identityNameEl.textContent = fighterName;
+  namingDone = true;
+  if (namingResolve) {
+    namingResolve(fighterName);
+    namingResolve = null;
+  }
+}
+namingConfirm.addEventListener("click", () => {
+  const name = namingInput.value.trim();
+  if (!name)
+    return;
+  dismissNaming(name);
+});
+namingInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter")
+    namingConfirm.click();
+});
+namingSkip.addEventListener("click", () => {
+  dismissNaming();
+});
 fightBtn.onclick = () => {
   if (!modelReady)
     return;
@@ -20727,23 +21337,44 @@ fightBtn.onclick = () => {
     clearShout();
     return;
   }
+  if (sparHumanWs || sparLlmWs) {
+    resetToAiMode();
+    fightBtn.textContent = "Fight!";
+    statusEl.textContent = "Disconnected.";
+    matchInfoEl.textContent = "";
+    return;
+  }
   connectAgent();
 };
 function connectAgent() {
-  const name = nameInput.value.trim() || nameInput.placeholder;
+  const name = fighterName;
   const proto = location.protocol === "https:" ? "wss:" : "ws:";
   ws = new WebSocket(`${proto}//${location.host}/agent`);
   fightBtn.textContent = "Disconnect";
   statusEl.textContent = "Connecting...";
   ws.onopen = () => {
-    ws.send(JSON.stringify({ type: "register", name, key: "" }));
+    ws.send(JSON.stringify({ type: "register", name, key: "", playerId }));
   };
   ws.onmessage = (ev) => {
     const msg = JSON.parse(ev.data);
     switch (msg.type) {
       case "registered":
         statusEl.textContent = "Registered! Joining queue...";
-        ws.send(JSON.stringify({ type: "join_queue" }));
+        if (msg.player) {
+          wins = msg.player.wins;
+          losses = msg.player.losses;
+          draws = msg.player.draws;
+          recordEl.textContent = `W: ${wins}  L: ${losses}  D: ${draws}  |  Elo: ${msg.player.rating}`;
+          identityStatsEl.textContent = `${wins}W ${losses}L · Elo ${msg.player.rating}`;
+          if (msg.player.wins + msg.player.losses + msg.player.draws > 0) {
+            log2("log-info", `Welcome back! ${msg.player.name} — ${msg.player.wins}W ${msg.player.losses}L${msg.player.streak > 1 ? `, ${msg.player.streak}-fight streak` : ""} (Elo: ${msg.player.rating})`);
+          }
+        }
+        if (tournamentMode) {
+          ws.send(JSON.stringify({ type: "request_tournament_match", rung: tournamentRung }));
+        } else {
+          ws.send(JSON.stringify({ type: "join_queue" }));
+        }
         coachBar.classList.add("in-match");
         break;
       case "queued":
@@ -20758,6 +21389,20 @@ function connectAgent() {
         clearShout();
         coachBar.classList.add("in-match");
         arenaOverlay.classList.add("hidden");
+        matchDamageDealt = 0;
+        matchDamageTaken = 0;
+        matchActionsUsed = {};
+        matchTicksPlayed = 0;
+        lastMyHp = 100;
+        lastOppHp = 100;
+        currentOpponent = msg.opponent;
+        coachingActive = false;
+        coachingPanel.style.display = "none";
+        myMinHp = 100;
+        wasLosingHp = false;
+        sparMatchActions = [];
+        requestNotifPermission();
+        document.title = "(Fighting...) TCF";
         log2("log-info", `── Match started vs ${msg.opponent} ──`);
         break;
       case "game_state":
@@ -20791,12 +21436,25 @@ function onGameState(msg) {
   const dist = Math.abs(msg.you.x - msg.opponent.x);
   tickDisplay.textContent = `T${msg.tick}  ${Math.ceil(msg.timeRemaining)}s`;
   lastStateReceivedAt = Date.now();
+  matchTicksPlayed++;
+  const dmgDealt = lastOppHp - msg.opponent.hp;
+  const dmgTaken = lastMyHp - msg.you.hp;
+  if (dmgDealt > 0)
+    matchDamageDealt += dmgDealt;
+  if (dmgTaken > 0)
+    matchDamageTaken += dmgTaken;
+  lastMyHp = msg.you.hp;
+  lastOppHp = msg.opponent.hp;
+  if (msg.you.hp < myMinHp)
+    myMinHp = msg.you.hp;
+  if (msg.you.hp < msg.opponent.hp)
+    wasLosingHp = true;
+  lastStateTick = msg.tick;
   if (inferring) {
     log2("log-skip", `T${msg.tick} ⏭ skipped (LLM still thinking)`);
     return;
   }
   log2("log-state", `T${msg.tick} ← state: hp=${msg.you.hp}/${msg.opponent.hp} dist=${dist} opp=${msg.opponent.lastAction ?? "-"}`);
-  lastStateTick = msg.tick;
   inferring = true;
   const stateReceivedAt = Date.now();
   const state = {
@@ -20822,6 +21480,7 @@ function onGameState(msg) {
       return;
     const msSinceLastState = Date.now() - lastStateReceivedAt;
     const delay = Math.max(0, MIN_RESPONSE_MS - msSinceLastState);
+    matchActionsUsed[action] = (matchActionsUsed[action] || 0) + 1;
     const send = () => {
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({
@@ -20843,25 +21502,636 @@ function onMatchEnd(msg) {
   clearShout();
   coachBar.classList.remove("in-match");
   arenaOverlay.classList.remove("hidden");
-  const name = nameInput.value.trim() || nameInput.placeholder;
+  if (tournamentMode) {
+    onTournamentMatchEnd(msg);
+    return;
+  }
+  matchCount++;
+  localStorage.setItem("clawfights-match-count", String(matchCount));
+  resetToAiMode();
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: "leave_queue" }));
+  }
+  const name = fighterName;
+  console.log("[DEBUG match_end]", { winner: msg.winner, fighterName: name, match: JSON.stringify(msg) });
+  log2("log-info", `[DEBUG] winner="${msg.winner}" vs name="${name}" equal=${msg.winner === name}`);
+  let result;
   if (msg.winner === null) {
     draws++;
+    result = "draw";
     statusEl.textContent = "Draw!";
     log2("log-info", `── Draw! ──`);
+    setTempTitle("(DRAW) TCF");
+    sendNotification("Draw!", `${name} vs ${currentOpponent} — timeout`);
   } else if (msg.winner === name) {
     wins++;
+    result = "win";
     statusEl.textContent = `You won! (${msg.reason})`;
     log2("log-info", `── You won! (${msg.reason}) ──`);
+    setTempTitle("(WIN!) TCF");
+    sendNotification("Victory!", `${name} defeated ${currentOpponent}!`);
   } else {
     losses++;
+    result = "loss";
     statusEl.textContent = `You lost to ${msg.winner}. (${msg.reason})`;
     log2("log-error", `── Lost to ${msg.winner} (${msg.reason}) ──`);
+    setTempTitle("(KO) TCF");
+    sendNotification("Defeated!", `${name} lost to ${msg.winner}`);
   }
   matchInfoEl.textContent = "";
   recordEl.textContent = `W: ${wins}  L: ${losses}  D: ${draws}`;
-  setTimeout(() => {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      statusEl.textContent = "Next match starting soon...";
-    }
-  }, 3000);
+  const summary = {
+    result,
+    reason: msg.reason === "ko" ? "ko" : "timeout",
+    myHp: lastMyHp,
+    oppHp: lastOppHp,
+    opponentName: currentOpponent,
+    ticksPlayed: matchTicksPlayed,
+    damageDealt: matchDamageDealt,
+    damageTaken: matchDamageTaken,
+    actionsUsed: matchActionsUsed
+  };
+  showCoachingPanel(summary);
 }
+function renderStatsCard(summary) {
+  const isComeback = summary.result === "win" && wasLosingHp && myMinHp <= 30;
+  const resultLabel = summary.result === "win" ? "VICTORY" : summary.result === "loss" ? "DEFEAT" : "DRAW";
+  const comebackHtml = isComeback ? `<span class="comeback-badge">COMEBACK</span>` : "";
+  const sortedActions = Object.entries(summary.actionsUsed).sort((a, b) => b[1] - a[1]).slice(0, 4);
+  const actionChips = sortedActions.map(([action, count]) => `<span class="action-chip">${action} x${count}</span>`).join("");
+  const dmgRatio = summary.damageDealt - summary.damageTaken;
+  const dmgClass = dmgRatio > 0 ? "positive" : dmgRatio < 0 ? "negative" : "";
+  statsCard.innerHTML = `
+    <div class="stats-card-header">
+      <div class="stats-card-result ${summary.result}">${resultLabel} vs ${summary.opponentName}${comebackHtml}</div>
+      <div class="stats-card-time">${summary.ticksPlayed} ticks · ${summary.reason.toUpperCase()}</div>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-item"><span class="stat-label">Damage Dealt</span><span class="stat-value positive">${summary.damageDealt}</span></div>
+      <div class="stat-item"><span class="stat-label">Damage Taken</span><span class="stat-value negative">${summary.damageTaken}</span></div>
+      <div class="stat-item"><span class="stat-label">Net Damage</span><span class="stat-value ${dmgClass}">${dmgRatio > 0 ? "+" : ""}${dmgRatio}</span></div>
+      <div class="stat-item"><span class="stat-label">Final HP</span><span class="stat-value">${summary.myHp} / ${summary.oppHp}</span></div>
+    </div>
+    ${actionChips ? `<div class="stats-actions">${actionChips}</div>` : ""}
+  `;
+  statsCard.classList.add("visible");
+  if (isComeback) {
+    log2("log-info", `COMEBACK! Won after dropping to ${myMinHp} HP!`);
+  }
+}
+function showCoachingPanel(summary) {
+  coachingActive = true;
+  renderStatsCard(summary);
+  const reflection = generateReflection(summary);
+  coachingReflection.textContent = reflection;
+  log2("log-info", `Fighter: "${reflection}"`);
+  coachingOptionsEl.innerHTML = "";
+  for (const opt of COACHING_OPTIONS) {
+    const btn = document.createElement("button");
+    btn.className = "coaching-btn";
+    btn.textContent = opt.label;
+    btn.addEventListener("click", () => {
+      applyCoachingAndDismiss(opt.advice, opt.promptFragment);
+    });
+    coachingOptionsEl.appendChild(btn);
+  }
+  coachingInput.value = "";
+  coachingAck.style.display = "none";
+  fightAgainBtn.style.display = "none";
+  coachingPanel.style.display = "block";
+}
+async function applyCoachingAndDismiss(advice, promptFragment) {
+  coachingOptionsEl.style.display = "none";
+  coachingPanel.querySelector(".coaching-custom").style.display = "none";
+  coachingSkip.style.display = "none";
+  const droppedRule = await applyCoaching(advice, promptFragment);
+  const ack = getAcknowledgment();
+  if (droppedRule) {
+    log2("log-info", `Fighter dropped rule: "${droppedRule}"`);
+    log2("log-info", `Fighter learned rule: "${promptFragment}"`);
+  } else {
+    log2("log-info", `Fighter learned rule: "${promptFragment}"`);
+  }
+  log2("log-info", `Fighter: "${ack}"`);
+  coachingAck.textContent = droppedRule ? `${ack} (Forgot: "${droppedRule}")` : ack;
+  coachingAck.style.display = "block";
+  await runPostMatchCeremonies(true);
+}
+async function runPostMatchCeremonies(coached) {
+  if (!firstCoachingDone) {
+    firstCoachingDone = true;
+    localStorage.setItem("clawfights-first-coaching-done", "true");
+    if (coached) {
+      await showAnnouncement({
+        icon: "\uD83C\uDFAF",
+        title: "Coaching Unlocked",
+        body: `<em>"${POST_COACHING_GREETINGS[Math.floor(Math.random() * POST_COACHING_GREETINGS.length)]}"</em><br><br>After every fight, you can review your fighter's performance and give advice. Your coaching shapes how they fight.`,
+        buttonText: "Let's go"
+      });
+    } else {
+      await showAnnouncement({
+        icon: "\uD83C\uDFAF",
+        title: "Coaching Available",
+        body: "After each fight, you can give your fighter advice to shape how they fight. Try it next time!",
+        buttonText: "Got it"
+      });
+    }
+  }
+  if (!namingDone) {
+    const name = await showNamingCeremony(true);
+    log2("log-info", `Fighter named: ${name}`);
+  }
+  if (matchCount >= SPAR_UNLOCK_THRESHOLD && !sparUnlocked) {
+    sparUnlocked = true;
+    localStorage.setItem("clawfights-spar-unlocked", "true");
+    const phrase = SPAR_UNLOCK_PHRASES[Math.floor(Math.random() * SPAR_UNLOCK_PHRASES.length)];
+    log2("log-info", `Fighter: "${phrase}"`);
+    await showAnnouncement({
+      icon: "\uD83C\uDFAE",
+      title: "Spar Mode Unlocked",
+      body: `<em>"${phrase}"</em><br><br>You can now fight using keyboard controls! After coaching, choose <strong>Spar Next Fight</strong> to take the controls yourself.`,
+      buttonText: "Nice!",
+      buttonStyle: "cyan"
+    });
+  }
+  fightAgainBtn.style.display = "block";
+  if (sparUnlocked) {
+    sparNextBtn.style.display = "block";
+  }
+}
+function dismissCoaching() {
+  coachingActive = false;
+  coachingPanel.style.display = "none";
+  statsCard.classList.remove("visible");
+  coachingOptionsEl.style.display = "";
+  const customEl = coachingPanel.querySelector(".coaching-custom");
+  if (customEl)
+    customEl.style.display = "";
+  coachingSkip.style.display = "";
+  coachingAck.style.display = "none";
+  fightAgainBtn.style.display = "none";
+  sparNextBtn.style.display = "none";
+}
+coachingSend.addEventListener("click", () => {
+  const text = coachingInput.value.trim();
+  if (!text)
+    return;
+  applyCoachingAndDismiss(text, text);
+});
+coachingInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    coachingSend.click();
+  }
+});
+coachingSkip.addEventListener("click", async () => {
+  log2("log-info", "Coach: (skipped coaching)");
+  coachingOptionsEl.style.display = "none";
+  coachingPanel.querySelector(".coaching-custom").style.display = "none";
+  coachingSkip.style.display = "none";
+  await runPostMatchCeremonies(false);
+});
+function requeueForFight() {
+  dismissCoaching();
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: "join_queue" }));
+    statusEl.textContent = "In queue — waiting for opponent...";
+    coachBar.classList.add("in-match");
+    arenaOverlayText.innerHTML = `Waiting for opponent...<span>Spectating other fights in the meantime</span>`;
+    log2("log-info", "── Queued for next fight ──");
+  }
+}
+fightAgainBtn.addEventListener("click", () => {
+  resetToAiMode();
+  requeueForFight();
+});
+sparNextBtn.addEventListener("click", () => {
+  activateSparMode();
+  dismissCoaching();
+  startSparMatch();
+});
+function startSparMatch() {
+  const proto = location.protocol === "https:" ? "wss:" : "ws:";
+  fightBtn.textContent = "Disconnect";
+  statusEl.textContent = "Setting up spar match...";
+  arenaOverlay.classList.add("hidden");
+  sparMatchActions = [];
+  matchDamageDealt = 0;
+  matchDamageTaken = 0;
+  matchActionsUsed = {};
+  matchTicksPlayed = 0;
+  lastMyHp = 100;
+  lastOppHp = 100;
+  myMinHp = 100;
+  wasLosingHp = false;
+  sparLlmInferring = false;
+  const dismissWs = new WebSocket(`${proto}//${location.host}/spectate`);
+  dismissWs.onopen = () => {
+    dismissWs.send(JSON.stringify({ type: "dismiss_npc" }));
+    setTimeout(() => {
+      dismissWs.close();
+      connectSparAgents();
+    }, 500);
+  };
+  dismissWs.onerror = () => connectSparAgents();
+  function connectSparAgents() {
+    sparLlmWs = new WebSocket(`${proto}//${location.host}/agent`);
+    sparLlmWs.onopen = () => {
+      sparLlmWs.send(JSON.stringify({ type: "register", name: fighterName, key: "" }));
+    };
+    sparLlmWs.onmessage = (ev) => {
+      const msg = JSON.parse(ev.data);
+      if (msg.type === "registered") {
+        sparLlmWs.send(JSON.stringify({ type: "join_queue" }));
+        connectSparHuman();
+      }
+      if (msg.type === "game_state") {
+        if (sparLlmInferring)
+          return;
+        sparLlmInferring = true;
+        const stateAt = Date.now();
+        const state = {
+          tick: msg.tick,
+          you: msg.you,
+          opponent: msg.opponent,
+          timeRemaining: msg.timeRemaining
+        };
+        pickAction(state).then((action) => {
+          sparLlmInferring = false;
+          if (!action || !sparLlmWs || sparLlmWs.readyState !== WebSocket.OPEN)
+            return;
+          const delay = Math.max(0, MIN_RESPONSE_MS - (Date.now() - stateAt));
+          setTimeout(() => {
+            if (sparLlmWs && sparLlmWs.readyState === WebSocket.OPEN) {
+              sparLlmWs.send(JSON.stringify({ type: "action", tick: msg.tick, action }));
+              log2("log-action", `T${msg.tick} → AI: ${action}`);
+            }
+          }, delay);
+        });
+      }
+      if (msg.type === "match_end") {
+        sparLlmWs.close();
+        sparLlmWs = null;
+      }
+    };
+    sparLlmWs.onerror = () => log2("log-error", "Spar LLM connection error");
+  }
+  function connectSparHuman() {
+    sparHumanWs = new WebSocket(`${proto}//${location.host}/agent`);
+    sparHumanWs.onopen = () => {
+      sparHumanWs.send(JSON.stringify({ type: "register", name: "Coach", key: "" }));
+    };
+    let humanLastStateAt = 0;
+    sparHumanWs.onmessage = (ev) => {
+      const msg = JSON.parse(ev.data);
+      if (msg.type === "registered") {
+        sparHumanWs.send(JSON.stringify({ type: "join_queue" }));
+      }
+      if (msg.type === "match_start") {
+        currentOpponent = msg.opponent;
+        statusEl.textContent = `Spar: You vs ${msg.opponent}`;
+        matchInfoEl.textContent = `Sparring: ${msg.opponent}`;
+        log2("log-info", `── Spar: You (Coach) vs ${msg.opponent} ──`);
+        document.title = "(Sparring...) TCF";
+      }
+      if (msg.type === "game_state") {
+        humanLastStateAt = Date.now();
+        const dist = Math.abs(msg.you.x - msg.opponent.x);
+        tickDisplay.textContent = `T${msg.tick}  ${Math.ceil(msg.timeRemaining)}s`;
+        matchTicksPlayed++;
+        const dmgDealt = lastOppHp - msg.opponent.hp;
+        const dmgTaken = lastMyHp - msg.you.hp;
+        if (dmgDealt > 0)
+          matchDamageDealt += dmgDealt;
+        if (dmgTaken > 0)
+          matchDamageTaken += dmgTaken;
+        lastMyHp = msg.you.hp;
+        lastOppHp = msg.opponent.hp;
+        if (msg.you.hp < myMinHp)
+          myMinHp = msg.you.hp;
+        if (msg.you.hp < msg.opponent.hp)
+          wasLosingHp = true;
+        const action = pendingKeyAction;
+        pendingKeyAction = null;
+        if (action) {
+          matchActionsUsed[action] = (matchActionsUsed[action] || 0) + 1;
+          sparMatchActions.push({
+            tick: msg.tick,
+            myHp: msg.you.hp,
+            oppHp: msg.opponent.hp,
+            distance: dist,
+            action,
+            oppAction: msg.opponent.lastAction ?? null
+          });
+          const delay = Math.max(0, MIN_RESPONSE_MS - (Date.now() - humanLastStateAt));
+          const send = () => {
+            if (sparHumanWs && sparHumanWs.readyState === WebSocket.OPEN) {
+              sparHumanWs.send(JSON.stringify({ type: "action", tick: msg.tick, action }));
+              log2("log-action", `T${msg.tick} → You: ${action}`);
+            }
+          };
+          if (delay > 0)
+            setTimeout(send, delay);
+          else
+            send();
+        } else {
+          log2("log-state", `T${msg.tick} ← hp=${msg.you.hp}/${msg.opponent.hp} dist=${dist} (no key)`);
+        }
+      }
+      if (msg.type === "match_end") {
+        sparHumanWs.close();
+        sparHumanWs = null;
+        onSparMatchEnd(msg);
+      }
+    };
+    sparHumanWs.onerror = () => log2("log-error", "Spar human connection error");
+  }
+}
+function onSparMatchEnd(msg) {
+  arenaOverlay.classList.remove("hidden");
+  arenaOverlayText.innerHTML = `Spectating other fights...<span>Your match will appear here once you join</span>`;
+  matchCount++;
+  localStorage.setItem("clawfights-match-count", String(matchCount));
+  const coachName = "Coach";
+  let result;
+  if (msg.winner === null) {
+    result = "draw";
+    statusEl.textContent = "Spar: Draw!";
+    log2("log-info", `── Spar Draw! ──`);
+  } else if (msg.winner === coachName) {
+    result = "win";
+    statusEl.textContent = `Spar: You beat ${fighterName}!`;
+    log2("log-info", `── You beat your fighter! ──`);
+  } else {
+    result = "loss";
+    statusEl.textContent = `Spar: ${fighterName} beat you!`;
+    log2("log-info", `── Your fighter beat you! ──`);
+  }
+  matchInfoEl.textContent = "";
+  document.title = originalTitle;
+  const summary = {
+    result,
+    reason: msg.reason === "ko" ? "ko" : "timeout",
+    myHp: lastMyHp,
+    oppHp: lastOppHp,
+    opponentName: fighterName,
+    ticksPlayed: matchTicksPlayed,
+    damageDealt: matchDamageDealt,
+    damageTaken: matchDamageTaken,
+    actionsUsed: matchActionsUsed
+  };
+  showCoachingPanel(summary);
+  if (sparMatchActions.length > 0) {
+    const sparLog = {
+      timestamp: new Date().toISOString(),
+      result,
+      actions: sparMatchActions
+    };
+    saveSparLog(sparLog);
+    log2("log-info", `Spar log saved (${sparMatchActions.length} actions)`);
+    const summaryText = buildReplaySummary(sparLog);
+    analyzeReplay(summaryText).then((style) => {
+      if (style) {
+        setCoachStyle(style);
+        log2("log-info", `Coach style learned: "${style}"`);
+      }
+    });
+  }
+  resetToAiMode();
+  fightBtn.textContent = "Fight!";
+}
+function showTournamentLadder() {
+  const state = loadTournamentState();
+  tournamentLadderEl.innerHTML = "";
+  for (const entry of TOURNAMENT_LADDER) {
+    const rung = document.createElement("div");
+    rung.className = "tournament-rung";
+    let statusIcon;
+    if (entry.rung < state.currentRung) {
+      rung.classList.add("completed");
+      statusIcon = "&#10003;";
+    } else if (entry.rung === state.currentRung && !state.completed) {
+      rung.classList.add("current");
+      statusIcon = "&#9876;";
+    } else if (state.completed) {
+      rung.classList.add("completed");
+      statusIcon = "&#10003;";
+    } else {
+      rung.classList.add("locked");
+      statusIcon = "&#128274;";
+    }
+    const attempts = state.attempts[entry.rung] || 0;
+    const attemptText = attempts > 0 ? ` · ${attempts} attempt${attempts > 1 ? "s" : ""}` : "";
+    rung.innerHTML = `
+      <span class="rung-number">${entry.rung + 1}</span>
+      <div class="rung-info">
+        <div class="rung-name">${entry.name}</div>
+        <div class="rung-title">${entry.title}${attemptText}</div>
+      </div>
+      <span class="rung-status">${statusIcon}</span>
+    `;
+    tournamentLadderEl.appendChild(rung);
+  }
+  if (state.completed) {
+    tournamentFightBtn.textContent = "Reset & Play Again";
+  } else {
+    const current = TOURNAMENT_LADDER[state.currentRung];
+    tournamentFightBtn.textContent = `Fight ${current.name}!`;
+  }
+  tournamentOverlay.classList.remove("hidden");
+}
+function startTournamentFight(rung) {
+  const state = loadTournamentState();
+  state.attempts[rung] = (state.attempts[rung] || 0) + 1;
+  saveTournamentState(state);
+  tournamentMode = true;
+  tournamentRung = rung;
+  tournamentOverlay.classList.add("hidden");
+  connectAgent();
+}
+function onTournamentMatchEnd(msg) {
+  const name = fighterName;
+  const state = loadTournamentState();
+  let result;
+  if (msg.winner === null) {
+    result = "draw";
+    statusEl.textContent = "Draw! Try again.";
+    log2("log-info", `── Tournament Draw! ──`);
+  } else if (msg.winner === name) {
+    result = "win";
+    statusEl.textContent = `Victory over ${currentOpponent}!`;
+    log2("log-info", `── Tournament Win vs ${currentOpponent}! ──`);
+    if (tournamentRung === state.currentRung) {
+      state.currentRung++;
+      if (state.currentRung >= 9) {
+        state.completed = true;
+      }
+      saveTournamentState(state);
+    }
+  } else {
+    result = "loss";
+    statusEl.textContent = `Defeated by ${currentOpponent}. Try again!`;
+    log2("log-error", `── Tournament Loss to ${currentOpponent} ──`);
+  }
+  matchInfoEl.textContent = "";
+  document.title = originalTitle;
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.close();
+  }
+  ws = null;
+  fightBtn.textContent = "Fight!";
+  tournamentMode = false;
+  const summary = {
+    result,
+    reason: msg.reason === "ko" ? "ko" : "timeout",
+    myHp: lastMyHp,
+    oppHp: lastOppHp,
+    opponentName: currentOpponent,
+    ticksPlayed: matchTicksPlayed,
+    damageDealt: matchDamageDealt,
+    damageTaken: matchDamageTaken,
+    actionsUsed: matchActionsUsed
+  };
+  showTournamentCoachingPanel(summary, result, tournamentRung, state);
+}
+function showTournamentCoachingPanel(summary, result, rung, state) {
+  const resultText = result === "win" ? "VICTORY" : result === "loss" ? "DEFEAT" : "DRAW";
+  postfightResultLabel.textContent = resultText;
+  postfightResultLabel.className = `postfight-result-label ${result}`;
+  postfightOpponent.textContent = `vs ${summary.opponentName} · ${summary.ticksPlayed} ticks · ${summary.reason.toUpperCase()}`;
+  const dmgRatio = summary.damageDealt - summary.damageTaken;
+  const dmgClass = dmgRatio > 0 ? "positive" : dmgRatio < 0 ? "negative" : "";
+  postfightStats.innerHTML = `
+    <div class="postfight-stat"><span class="postfight-stat-label">Damage Dealt</span><span class="postfight-stat-value" style="color:var(--green)">${summary.damageDealt}</span></div>
+    <div class="postfight-stat"><span class="postfight-stat-label">Damage Taken</span><span class="postfight-stat-value" style="color:var(--red)">${summary.damageTaken}</span></div>
+    <div class="postfight-stat"><span class="postfight-stat-label">Net Damage</span><span class="postfight-stat-value" style="color:${dmgClass === "positive" ? "var(--green)" : dmgClass === "negative" ? "var(--red)" : "var(--text-1)"}">${dmgRatio > 0 ? "+" : ""}${dmgRatio}</span></div>
+    <div class="postfight-stat"><span class="postfight-stat-label">Final HP</span><span class="postfight-stat-value">${summary.myHp} / ${summary.oppHp}</span></div>
+  `;
+  const sortedActions = Object.entries(summary.actionsUsed).sort((a, b) => b[1] - a[1]).slice(0, 4);
+  postfightActionsUsed.innerHTML = sortedActions.map(([action, count]) => `<span class="action-chip">${action} x${count}</span>`).join("");
+  const reflections = TOURNAMENT_REFLECTIONS[rung];
+  let reflection;
+  if (reflections && result !== "draw") {
+    const pool = result === "win" ? reflections.win : reflections.loss;
+    reflection = pool[Math.floor(Math.random() * pool.length)];
+  } else {
+    reflection = generateReflection(summary);
+  }
+  postfightReflection.textContent = reflection;
+  log2("log-info", `Fighter: "${reflection}"`);
+  postfightCoachingOptions.innerHTML = "";
+  const suggestedIndices = TOURNAMENT_SUGGESTED_COACHING[rung] || [0, 1];
+  for (const idx of suggestedIndices) {
+    const opt = COACHING_OPTIONS[idx];
+    if (!opt)
+      continue;
+    const btn = document.createElement("button");
+    btn.className = "coaching-btn";
+    btn.textContent = opt.label;
+    btn.addEventListener("click", () => {
+      applyCoachingAndDismissTournament(opt.advice, opt.promptFragment, result, rung, state);
+    });
+    postfightCoachingOptions.appendChild(btn);
+  }
+  postfightCoachingInput.value = "";
+  postfightCoachingAck.style.display = "none";
+  postfightCoachingLabel.style.display = "";
+  postfightCoachingOptions.style.display = "";
+  postfightCoachingCustom.style.display = "";
+  postfightSkip.style.display = "";
+  renderPostfightNav(result, rung, state);
+  postfightSkip.onclick = () => {
+    postfightCoachingLabel.style.display = "none";
+    postfightCoachingOptions.style.display = "none";
+    postfightCoachingCustom.style.display = "none";
+    postfightSkip.style.display = "none";
+  };
+  postfightCoachingSend.onclick = () => {
+    const text = postfightCoachingInput.value.trim();
+    if (!text)
+      return;
+    applyCoachingAndDismissTournament(text, text, result, rung, state);
+  };
+  postfightOverlay.classList.remove("hidden");
+}
+async function applyCoachingAndDismissTournament(advice, promptFragment, result, rung, state) {
+  postfightCoachingLabel.style.display = "none";
+  postfightCoachingOptions.style.display = "none";
+  postfightCoachingCustom.style.display = "none";
+  postfightSkip.style.display = "none";
+  const droppedRule = await applyCoaching(advice, promptFragment);
+  const ack = getAcknowledgment();
+  if (droppedRule) {
+    log2("log-info", `Fighter dropped rule: "${droppedRule}"`);
+  }
+  log2("log-info", `Fighter learned rule: "${promptFragment}"`);
+  log2("log-info", `Fighter: "${ack}"`);
+  postfightCoachingAck.textContent = droppedRule ? `${ack} (Forgot: "${droppedRule}")` : ack;
+  postfightCoachingAck.style.display = "block";
+}
+function renderPostfightNav(result, rung, state) {
+  postfightNav.innerHTML = "";
+  if (result === "win" && state.completed) {
+    const victoryBtn = document.createElement("button");
+    victoryBtn.className = "postfight-nav-btn primary";
+    victoryBtn.textContent = "View Championship!";
+    victoryBtn.addEventListener("click", () => {
+      postfightOverlay.classList.add("hidden");
+      showTournamentVictory();
+    });
+    postfightNav.appendChild(victoryBtn);
+  } else if (result === "win" && state.currentRung <= 8) {
+    const nextBtn = document.createElement("button");
+    nextBtn.className = "postfight-nav-btn primary";
+    nextBtn.textContent = `Next: ${TOURNAMENT_LADDER[state.currentRung].name}`;
+    nextBtn.addEventListener("click", () => {
+      postfightOverlay.classList.add("hidden");
+      startTournamentFight(state.currentRung);
+    });
+    postfightNav.appendChild(nextBtn);
+  }
+  if (result === "loss" || result === "draw") {
+    const retryBtn = document.createElement("button");
+    retryBtn.className = "postfight-nav-btn primary";
+    retryBtn.textContent = `Retry: ${TOURNAMENT_LADDER[rung].name}`;
+    retryBtn.addEventListener("click", () => {
+      postfightOverlay.classList.add("hidden");
+      startTournamentFight(rung);
+    });
+    postfightNav.appendChild(retryBtn);
+  }
+  const lobbyBtn = document.createElement("button");
+  lobbyBtn.className = "postfight-nav-btn secondary";
+  lobbyBtn.textContent = "Back to Lobby";
+  lobbyBtn.addEventListener("click", () => {
+    postfightOverlay.classList.add("hidden");
+  });
+  postfightNav.appendChild(lobbyBtn);
+}
+function showTournamentVictory() {
+  tournamentVictoryOverlay.classList.remove("hidden");
+}
+tournamentBtn.onclick = () => {
+  if (!modelReady)
+    return;
+  if (ws && ws.readyState === WebSocket.OPEN)
+    return;
+  if (sparHumanWs || sparLlmWs)
+    return;
+  showTournamentLadder();
+};
+tournamentFightBtn.onclick = () => {
+  const state = loadTournamentState();
+  if (state.completed) {
+    const fresh = { currentRung: 0, attempts: {}, completed: false };
+    saveTournamentState(fresh);
+    showTournamentLadder();
+    return;
+  }
+  startTournamentFight(state.currentRung);
+};
+tournamentBackBtn.onclick = () => {
+  tournamentOverlay.classList.add("hidden");
+};
+tournamentVictoryDismiss.onclick = () => {
+  tournamentVictoryOverlay.classList.add("hidden");
+};
