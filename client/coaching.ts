@@ -194,12 +194,9 @@ export function clearCoachingHistory(): void {
 // Structure: 2 fixed rules + up to 2 coaching rules = max 4 rules total.
 // The model sees a numbered list and picks an action. That's it.
 
-export function buildDynamicSystemPrompt(approachAction?: string): string {
-  const moveRule = approachAction
-    ? `If distance > 2: use ${approachAction} to reach opponent.`
-    : "If distance > 2: move toward opponent.";
+export function buildDynamicSystemPrompt(): string {
   const rules: string[] = [
-    moveRule,
+    "If distance > 2: move toward opponent.",
     "Attacks hit only at distance ≤ 2. punch=10dmg kick=15dmg(2cd) special=25dmg(5cd).",
   ];
 

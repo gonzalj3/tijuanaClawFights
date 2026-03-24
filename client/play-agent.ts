@@ -2,7 +2,7 @@
 // Downloads a quantized model via WebLLM and plays using in-browser inference.
 // No heuristic fallback — if LLM isn't ready or inference is slow, ticks are skipped.
 
-const PLAY_AGENT_VERSION = "v9";
+const PLAY_AGENT_VERSION = "v10";
 console.log(`[play-agent] version ${PLAY_AGENT_VERSION}`);
 
 import { checkWebGPUSupport, initEngine, isModelCached, pickAction, type GameState, type Action } from "./browser-llm";

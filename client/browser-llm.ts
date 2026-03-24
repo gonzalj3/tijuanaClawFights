@@ -139,12 +139,10 @@ export async function chooseRuleToReplace(
 export async function pickAction(state: GameState, coachHint?: string): Promise<Action | null> {
   if (!engine) return null;
 
-  const approach = state.you.x < state.opponent.x ? "move_right" : "move_left";
-
   try {
     const response = await engine.chat.completions.create({
       messages: [
-        { role: "system", content: buildDynamicSystemPrompt(approach) },
+        { role: "system", content: buildDynamicSystemPrompt() },
         { role: "user", content: buildUserPrompt(state, coachHint) },
       ],
       max_tokens: 10,
