@@ -64,33 +64,6 @@ h1 {
   border-color: #44ff44 !important;
   color: #44ff44 !important;
 }
-.play-now-btn {
-  display: inline-block;
-  background: #ff4444;
-  color: #fff !important;
-  border: 2px solid #ff4444;
-  border-radius: 4px;
-  padding: 0.5rem 2rem;
-  font-family: 'Courier New', monospace;
-  font-size: 1rem;
-  font-weight: bold;
-  cursor: pointer;
-  text-transform: uppercase;
-  letter-spacing: 3px;
-  text-decoration: none;
-  transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
-  box-shadow: 0 0 16px rgba(255, 68, 68, 0.4);
-  line-height: 1;
-}
-.play-now-btn:visited {
-  color: #fff !important;
-}
-.play-now-btn:hover {
-  background: #e03030;
-  box-shadow: 0 0 24px rgba(255, 68, 68, 0.6);
-  transform: translateY(-1px);
-  color: #fff !important;
-}
 
 /* Leaderboard */
 #leaderboard {
@@ -210,6 +183,7 @@ body.embed-mode {
 body.embed-mode .arena-title,
 body.embed-mode #status,
 body.embed-mode #controls,
+body.embed-mode #play-now-btn,
 body.embed-mode #leaderboard,
 body.embed-mode #agent-panels {
   display: none !important;
