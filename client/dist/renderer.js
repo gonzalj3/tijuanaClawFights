@@ -33662,6 +33662,12 @@ var matchInfoText;
 var announcementText;
 var announcementTimer = 0;
 var waitingFighterName = null;
+var myFighterName = null;
+window.addEventListener("message", (ev) => {
+  if (ev.data?.type === "setMyFighter" && typeof ev.data.name === "string") {
+    myFighterName = ev.data.name;
+  }
+});
 async function main() {
   statusEl = document.getElementById("status");
   const assets = await loadAllAssets();
@@ -33708,6 +33714,7 @@ async function main() {
   const hp2Fill = new Graphics;
   gameLayer.addChild(hp1Bg, hp1Fill, hp2Bg, hp2Fill);
   const nameStyle = new TextStyle({ fontSize: 14, fill: 16777215, fontFamily: "Courier New" });
+  const myNameStyle = new TextStyle({ fontSize: 18, fill: 16777215, fontFamily: "Courier New", fontWeight: "bold" });
   const name1 = new Text({ text: "", style: nameStyle });
   const name2 = new Text({ text: "", style: nameStyle });
   gameLayer.addChild(name1, name2);
@@ -34036,6 +34043,8 @@ async function main() {
       const fill = i2 === 0 ? hp1Fill : hp2Fill;
       drawHpBar(bg, fill, x2, tgt.hp);
       const nameLabel = i2 === 0 ? name1 : name2;
+      const isMyFighter = myFighterName !== null && tgt.name === myFighterName;
+      nameLabel.style = isMyFighter ? myNameStyle : nameStyle;
       nameLabel.text = tgt.name;
       nameLabel.x = x2 - nameLabel.width / 2;
       nameLabel.y = renderY - FIGHTER_H - 38;

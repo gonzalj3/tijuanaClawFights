@@ -20628,10 +20628,9 @@ async function applyCoaching(advice, promptFragment) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
   return droppedRule;
 }
-function buildDynamicSystemPrompt(approachAction) {
-  const moveRule = approachAction ? `If distance > 2: use ${approachAction} to reach opponent.` : "If distance > 2: move toward opponent.";
+function buildDynamicSystemPrompt() {
   const rules = [
-    moveRule,
+    "If distance > 2: move toward opponent.",
     "Attacks hit only at distance ≤ 2. punch=10dmg kick=15dmg(2cd) special=25dmg(5cd)."
   ];
   const history = getCoachingHistory();
@@ -20817,11 +20816,10 @@ Which rule number should be replaced?`
 async function pickAction(state, coachHint) {
   if (!engine)
     return null;
-  const approach = state.you.x < state.opponent.x ? "move_right" : "move_left";
   try {
     const response = await engine.chat.completions.create({
       messages: [
-        { role: "system", content: buildDynamicSystemPrompt(approach) },
+        { role: "system", content: buildDynamicSystemPrompt() },
         { role: "user", content: buildUserPrompt(state, coachHint) }
       ],
       max_tokens: 10,
@@ -20891,6 +20889,8 @@ Defensive actions (block/jump): ${defensiveActions}`;
 }
 
 // client/play-agent.ts
+var PLAY_AGENT_VERSION = "v11";
+console.log(`[play-agent] version ${PLAY_AGENT_VERSION}`);
 var statusEl = document.getElementById("status");
 var progressBar = document.getElementById("progress-bar");
 var progressText = document.getElementById("progress-text");
@@ -21213,6 +21213,16 @@ function generateRandomName() {
 }
 var fighterName = localStorage.getItem("clawfights-name") || generateRandomName();
 identityNameEl.textContent = fighterName;
+function notifyIframeMyFighter(name) {
+  const iframe = document.querySelector(".arena-frame iframe");
+  if (iframe?.contentWindow) {
+    iframe.contentWindow.postMessage({ type: "setMyFighter", name }, "*");
+  }
+}
+var arenaIframe = document.querySelector(".arena-frame iframe");
+if (arenaIframe) {
+  arenaIframe.addEventListener("load", () => notifyIframeMyFighter(fighterName));
+}
 identityNameEl.addEventListener("click", () => {
   if (ws && ws.readyState === WebSocket.OPEN)
     return;
@@ -21309,6 +21319,7 @@ function dismissNaming(name) {
     localStorage.setItem("clawfights-name", name);
   }
   identityNameEl.textContent = fighterName;
+  notifyIframeMyFighter(fighterName);
   namingDone = true;
   if (namingResolve) {
     namingResolve(fighterName);
@@ -21388,6 +21399,7 @@ function connectAgent() {
       case "match_start":
         statusEl.textContent = `Match started vs ${msg.opponent}!`;
         matchInfoEl.textContent = `Fighting: ${msg.opponent}`;
+        notifyIframeMyFighter(fighterName);
         lastStateTick = -1;
         inferring = false;
         clearShout();

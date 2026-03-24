@@ -109,7 +109,8 @@ export function handleAgentMessage(
       // Track streak for progressive NPC difficulty
       engine.setAgentStreak(ws.data.agentId, msg.streak ?? 0);
       ws.send(JSON.stringify({ type: "queued" }));
-      matchmaker.enqueue(ws.data.agentId, name);
+      const isPlayer = !!agentPlayerIds.get(ws.data.agentId);
+      matchmaker.enqueue(ws.data.agentId, name, isPlayer);
       break;
     }
 

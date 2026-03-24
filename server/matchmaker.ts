@@ -3,6 +3,7 @@ import { GameEngine } from "./game-engine.ts";
 interface QueuedAgent {
   id: string;
   name: string;
+  isPlayer?: boolean; // true for browser play-page agents (have playerId)
 }
 
 export const MAX_FIGHTS = 50;
@@ -16,11 +17,11 @@ export class Matchmaker {
 
   constructor(private engine: GameEngine) {}
 
-  enqueue(agentId: string, agentName: string): void {
+  enqueue(agentId: string, agentName: string, isPlayer?: boolean): void {
     // Don't double-queue
     if (this.queue.some((a) => a.id === agentId)) return;
     this.noAutoRequeue.delete(agentId); // clear pause flag on explicit join
-    this.queue.push({ id: agentId, name: agentName });
+    this.queue.push({ id: agentId, name: agentName, isPlayer });
     console.log(`[Matchmaker] ${agentName} joined queue (${this.queue.length} waiting)`);
     this.tryMatch();
   }
@@ -139,8 +140,13 @@ export class Matchmaker {
 
   private tryMatch(): void {
     while (this.queue.length >= 2) {
-      const a0 = this.queue.shift()!;
-      const a1 = this.queue.shift()!;
+      let a0 = this.queue.shift()!;
+      let a1 = this.queue.shift()!;
+
+      // Ensure player agents are always fighter 0 (left side of screen)
+      if (a1.isPlayer && !a0.isPlayer) {
+        [a0, a1] = [a1, a0];
+      }
 
       const matchId = `match-${++this.matchCounter}`;
       console.log(`[Matchmaker] Creating ${matchId}: ${a0.name} vs ${a1.name}`);

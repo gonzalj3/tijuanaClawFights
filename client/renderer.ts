@@ -42,6 +42,14 @@ let matchInfoText: Text;
 let announcementText: Text;
 let announcementTimer = 0;
 let waitingFighterName: string | null = null;
+let myFighterName: string | null = null; // set by play page via postMessage
+
+// Listen for parent window telling us which fighter is the user's
+window.addEventListener("message", (ev) => {
+  if (ev.data?.type === "setMyFighter" && typeof ev.data.name === "string") {
+    myFighterName = ev.data.name;
+  }
+});
 
 async function main() {
   statusEl = document.getElementById("status")!;
@@ -102,8 +110,9 @@ async function main() {
   const hp2Fill = new Graphics();
   gameLayer.addChild(hp1Bg, hp1Fill, hp2Bg, hp2Fill);
 
-  // Name labels
+  // Name labels — user's fighter gets a bigger, bolder style
   const nameStyle = new TextStyle({ fontSize: 14, fill: 0xffffff, fontFamily: "Courier New" });
+  const myNameStyle = new TextStyle({ fontSize: 18, fill: 0xffffff, fontFamily: "Courier New", fontWeight: "bold" });
   const name1 = new Text({ text: "", style: nameStyle });
   const name2 = new Text({ text: "", style: nameStyle });
   gameLayer.addChild(name1, name2);
@@ -527,7 +536,10 @@ async function main() {
       drawHpBar(bg, fill, x, tgt.hp);
 
       // Names (follow the fighter up during jump)
+      // User's fighter name is bigger and bolder
       const nameLabel = i === 0 ? name1 : name2;
+      const isMyFighter = myFighterName !== null && tgt.name === myFighterName;
+      nameLabel.style = isMyFighter ? myNameStyle : nameStyle;
       nameLabel.text = tgt.name;
       nameLabel.x = x - nameLabel.width / 2;
       nameLabel.y = renderY - FIGHTER_H - 38;

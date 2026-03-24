@@ -2,7 +2,7 @@
 // Downloads a quantized model via WebLLM and plays using in-browser inference.
 // No heuristic fallback — if LLM isn't ready or inference is slow, ticks are skipped.
 
-const PLAY_AGENT_VERSION = "v10";
+const PLAY_AGENT_VERSION = "v11";
 console.log(`[play-agent] version ${PLAY_AGENT_VERSION}`);
 
 import { checkWebGPUSupport, initEngine, isModelCached, pickAction, type GameState, type Action } from "./browser-llm";
@@ -368,6 +368,19 @@ const FIGHTER_GREETINGS = [
 let fighterName: string = localStorage.getItem("clawfights-name") || generateRandomName();
 identityNameEl.textContent = fighterName;
 
+// Notify the arena iframe which fighter belongs to the user (for name styling)
+function notifyIframeMyFighter(name: string) {
+  const iframe = document.querySelector(".arena-frame iframe") as HTMLIFrameElement | null;
+  if (iframe?.contentWindow) {
+    iframe.contentWindow.postMessage({ type: "setMyFighter", name }, "*");
+  }
+}
+// Send initial name once iframe loads
+const arenaIframe = document.querySelector(".arena-frame iframe") as HTMLIFrameElement | null;
+if (arenaIframe) {
+  arenaIframe.addEventListener("load", () => notifyIframeMyFighter(fighterName));
+}
+
 // Click name to trigger rename via naming ceremony
 identityNameEl.addEventListener("click", () => {
   if (ws && ws.readyState === WebSocket.OPEN) return; // can't rename mid-fight
@@ -508,6 +521,7 @@ function dismissNaming(name?: string) {
     localStorage.setItem("clawfights-name", name);
   }
   identityNameEl.textContent = fighterName;
+  notifyIframeMyFighter(fighterName);
   namingDone = true;
   if (namingResolve) {
     namingResolve(fighterName);
@@ -598,6 +612,7 @@ function connectAgent() {
       case "match_start":
         statusEl.textContent = `Match started vs ${msg.opponent}!`;
         matchInfoEl.textContent = `Fighting: ${msg.opponent}`;
+        notifyIframeMyFighter(fighterName);
         lastStateTick = -1;
         inferring = false;
         clearShout();
