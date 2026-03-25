@@ -1290,9 +1290,102 @@
     opacity: 0.3;
     cursor: not-allowed;
   }
+
+  /* ─── Mobile responsive ─── */
+  @media (max-width: 600px) {
+    .page { padding: 12px; }
+    .nav { gap: 10px; margin-bottom: 20px; }
+    .identity-bar { padding: 10px 12px; }
+    .identity-name { font-size: 15px; }
+    .fight-btn, .tournament-btn { padding: 8px 16px; font-size: 13px; }
+    .coach-bar { flex-wrap: wrap; gap: 6px; padding: 8px 10px; }
+    .shout-btn { padding: 6px 10px; font-size: 12px; }
+    .agent-log-panel { max-height: 150px; }
+    #agent-log { max-height: 120px; }
+    .coach-popup img { width: 96px; height: 96px; }
+    .stats-grid { grid-template-columns: 1fr; }
+    .postfight-stats { grid-template-columns: 1fr; }
+    .keyboard-hud .key-row { gap: 6px; }
+    .keyboard-hud kbd { min-width: 36px; padding: 4px 6px; font-size: 11px; }
+    .tournament-title { font-size: 18px; }
+    .brain-btn { font-size: 12px; padding: 6px 10px; }
+    .prompt-viewer { max-height: 200px; }
+  }
+
+  /* ─── Rotate-to-landscape modal ─── */
+  #rotate-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(12,12,20,0.88);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 16px;
+    color: var(--text-1);
+    font-family: 'Space Grotesk', sans-serif;
+    text-align: center;
+    padding: 24px;
+  }
+  #rotate-modal.visible { display: flex; }
+  #rotate-modal .rotate-icon {
+    font-size: 48px;
+    animation: rotate-nudge 1.5s ease-in-out infinite;
+  }
+  @keyframes rotate-nudge {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(90deg); }
+    50% { transform: rotate(90deg); }
+    75% { transform: rotate(0deg); }
+  }
+  #rotate-modal h2 {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0;
+  }
+  #rotate-modal p {
+    font-size: 14px;
+    color: var(--text-2);
+    max-width: 260px;
+    line-height: 1.5;
+    margin: 0;
+  }
+  #rotate-modal .rotate-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-2);
+    font-size: 18px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  #rotate-modal .rotate-close:hover {
+    background: rgba(255,255,255,0.2);
+    color: var(--text-1);
+  }
 </style>
 </head>
 <body>
+
+<!-- Rotate-to-landscape prompt (mobile portrait only) -->
+<div id="rotate-modal">
+  <button class="rotate-close" aria-label="Close">&times;</button>
+  <div class="rotate-icon">📱</div>
+  <h2>Rotate for the full fight</h2>
+  <p>Turn your phone sideways to see the entire arena and all the action.</p>
+</div>
+
 <div class="page">
   <nav class="nav">
     <a href="/" class="nav-logo">Arena <span>Claw Fights</span></a>
@@ -1480,5 +1573,40 @@
 </div>
 
 <script type="module" src="/dist/play-agent.js?v=13"></script>
+<script>
+(function() {
+  const modal = document.getElementById('rotate-modal');
+  const closeBtn = modal.querySelector('.rotate-close');
+  let dismissed = false;
+
+  function isMobile() {
+    return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+           (navigator.maxTouchPoints > 1 && window.innerWidth <= 1024);
+  }
+
+  function isPortrait() {
+    return window.innerHeight > window.innerWidth;
+  }
+
+  function update() {
+    if (dismissed || !isMobile()) {
+      modal.classList.remove('visible');
+      return;
+    }
+    modal.classList.toggle('visible', isPortrait());
+  }
+
+  closeBtn.addEventListener('click', function() {
+    dismissed = true;
+    modal.classList.remove('visible');
+  });
+
+  if (screen.orientation) {
+    screen.orientation.addEventListener('change', update);
+  }
+  window.addEventListener('resize', update);
+  update();
+})();
+</script>
 </body>
 </html>
