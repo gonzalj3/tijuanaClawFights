@@ -2,7 +2,7 @@
 // Downloads a quantized model via WebLLM and plays using in-browser inference.
 // No heuristic fallback — if LLM isn't ready or inference is slow, ticks are skipped.
 
-const PLAY_AGENT_VERSION = "v12";
+const PLAY_AGENT_VERSION = "v13";
 console.log(`[play-agent] version ${PLAY_AGENT_VERSION}`);
 
 import { checkWebGPUSupport, initEngine, isModelCached, pickAction, type GameState, type Action } from "./browser-llm";
@@ -23,6 +23,15 @@ import {
 } from "./coaching";
 import { saveSparLog, buildReplaySummary, setCoachStyle, type SparActionEntry, type SparringLog } from "./sparring-log";
 import { analyzeReplay } from "./browser-llm";
+
+// ─── Analytics ──────────────────────────────────────────────────
+function trackEvent(event: string, metadata?: Record<string, any>) {
+  fetch("/api/event", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ event, playerId, metadata }),
+  }).catch(() => {}); // fire-and-forget
+}
 
 // ─── DOM Elements ───────────────────────────────────────────────
 const statusEl = document.getElementById("status")!;
@@ -815,6 +824,10 @@ function connectAgent() {
         requestNotifPermission();
         document.title = "(Fighting...) TCF";
         log("log-info", `── Match started vs ${msg.opponent} ──`);
+        trackEvent("fight_start", {
+          mode: tournamentMode ? "tournament" : "ai",
+          ...(tournamentMode && { rung: tournamentRung }),
+        });
         break;
 
       case "game_state":
@@ -990,6 +1003,8 @@ function onMatchEnd(msg: any) {
   matchInfoEl.textContent = "";
   recordEl.textContent = `W: ${wins}  L: ${losses}  D: ${draws}`;
 
+  trackEvent("fight_end", { mode: "ai", result, opponent: currentOpponent });
+
   // Build match summary and show post-fight overlay (same modal as tournament)
   const summary: MatchSummary = {
     result,
@@ -1071,6 +1086,7 @@ function showCoachingPanel(summary: MatchSummary) {
 }
 
 async function applyCoachingAndDismiss(advice: string, promptFragment: string) {
+  trackEvent("coaching_given", { source: advice === promptFragment ? "custom" : "preset" });
   // Hide coaching UI while LLM decides
   coachingOptionsEl.style.display = "none";
   (coachingPanel.querySelector(".coaching-custom") as HTMLElement).style.display = "none";
@@ -1248,6 +1264,7 @@ function showRegularPostfightOverlay(summary: MatchSummary) {
 }
 
 async function applyCoachingAndDismissRegular(advice: string, promptFragment: string) {
+  trackEvent("coaching_given", { source: advice === promptFragment ? "custom" : "preset" });
   postfightCoachingLabel.style.display = "none";
   postfightCoachingOptions.style.display = "none";
   postfightCoachingCustom.style.display = "none";
@@ -1384,6 +1401,8 @@ function startSparMatch() {
   myMinHp = 100;
   wasLosingHp = false;
   sparLlmInferring = false;
+
+  trackEvent("fight_start", { mode: "spar" });
 
   // Step 1: Dismiss the NPC so our two agents can match together
   const dismissWs = new WebSocket(`${proto}//${location.host}/spectate`);
@@ -1548,6 +1567,8 @@ function onSparMatchEnd(msg: any) {
     actionsUsed: matchActionsUsed,
   };
 
+  trackEvent("fight_end", { mode: "spar", result });
+
   showCoachingPanel(summary);
 
   // Save spar log and analyze
@@ -1666,6 +1687,8 @@ function onTournamentMatchEnd(msg: any) {
 
   matchInfoEl.textContent = "";
   document.title = originalTitle;
+
+  trackEvent("fight_end", { mode: "tournament", result, rung: tournamentRung });
 
   // Disconnect the tournament WS
   if (ws && ws.readyState === WebSocket.OPEN) {
@@ -1790,6 +1813,7 @@ async function applyCoachingAndDismissTournament(
   rung: number,
   state: TournamentState,
 ) {
+  trackEvent("coaching_given", { source: advice === promptFragment ? "custom" : "preset" });
   postfightCoachingLabel.style.display = "none";
   postfightCoachingOptions.style.display = "none";
   postfightCoachingCustom.style.display = "none";

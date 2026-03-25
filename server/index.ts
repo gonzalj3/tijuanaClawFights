@@ -3,6 +3,7 @@ import { Matchmaker } from "./matchmaker.ts";
 import { handleAgentMessage, handleAgentClose, setPlayersDb, type AgentData } from "./agent-connection.ts";
 import type { SpectatorControlMessage } from "./protocol.ts";
 import { createPlayersDb } from "./players.ts";
+import { trackEvent, getStats } from "./analytics.ts";
 import { readFileSync } from "fs";
 import { join } from "path";
 
@@ -77,6 +78,22 @@ const server = Bun.serve({
     if (url.pathname === "/api/matches") {
       const msg = engine.getMatchList() as any;
       return Response.json(msg.matches ?? []);
+    }
+    if (url.pathname === "/api/event" && req.method === "POST") {
+      try {
+        const body = await req.json();
+        const { event, playerId, metadata } = body;
+        if (!event || typeof event !== "string") {
+          return Response.json({ error: "event required" }, { status: 400 });
+        }
+        trackEvent(event, playerId, metadata);
+        return Response.json({ ok: true });
+      } catch {
+        return Response.json({ error: "invalid json" }, { status: 400 });
+      }
+    }
+    if (url.pathname === "/api/stats") {
+      return Response.json(getStats());
     }
 
     // Landing page
