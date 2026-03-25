@@ -3,7 +3,7 @@ import { Matchmaker } from "./matchmaker.ts";
 import { handleAgentMessage, handleAgentClose, setPlayersDb, type AgentData } from "./agent-connection.ts";
 import type { SpectatorControlMessage } from "./protocol.ts";
 import { createPlayersDb } from "./players.ts";
-import { trackEvent, getStats } from "./analytics.ts";
+import { trackEvent } from "./analytics.ts";
 import { readFileSync } from "fs";
 import { join } from "path";
 
@@ -91,9 +91,6 @@ const server = Bun.serve({
       } catch {
         return Response.json({ error: "invalid json" }, { status: 400 });
       }
-    }
-    if (url.pathname === "/api/stats") {
-      return Response.json(getStats());
     }
 
     // Landing page
