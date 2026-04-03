@@ -102,6 +102,57 @@
   }
   .identity-spacer { flex: 1; }
 
+  /* ─── Fighter picker ─── */
+  .fighter-picker {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding: 10px 16px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+  .picker-label {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-2);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .fighter-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 6px;
+    background: transparent;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    color: var(--text-2);
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .fighter-card:hover {
+    border-color: rgba(255,255,255,0.25);
+    background: var(--bg-card-hover);
+  }
+  .fighter-card.selected {
+    border-color: var(--red);
+    background: var(--red-glow);
+    color: var(--text-1);
+  }
+  .fighter-thumb {
+    width: 64px;
+    height: 64px;
+    image-rendering: pixelated;
+    border-radius: 6px;
+  }
+
   .fight-btn {
     padding: 12px 32px;
     background: var(--red);
@@ -1310,6 +1361,9 @@
     .tournament-title { font-size: 18px; }
     .brain-btn { font-size: 12px; padding: 6px 10px; }
     .prompt-viewer { max-height: 200px; }
+    .fighter-picker { gap: 8px; padding: 8px 10px; }
+    .fighter-thumb { width: 48px; height: 48px; }
+    .fighter-card { font-size: 10px; padding: 4px; }
   }
 
   /* ─── Rotate-to-landscape modal ─── */
@@ -1413,6 +1467,22 @@
       <span class="identity-spacer"></span>
       <button id="fight-btn" class="fight-btn" disabled>Fight!</button>
       <button id="tournament-btn" class="tournament-btn" disabled>Tournament</button>
+    </div>
+
+    <div class="fighter-picker" id="fighter-picker">
+      <span class="picker-label">Fighter:</span>
+      <button class="fighter-card selected" data-skin="blue" title="Lobster (Headband)">
+        <canvas class="fighter-thumb" width="128" height="128"></canvas>
+        <span>Headband</span>
+      </button>
+      <button class="fighter-card" data-skin="red" title="Lobster (Bandana)">
+        <canvas class="fighter-thumb" width="128" height="128"></canvas>
+        <span>Bandana</span>
+      </button>
+      <button class="fighter-card" data-skin="bear" title="Bear (Boxing Gloves)">
+        <canvas class="fighter-thumb" width="128" height="128"></canvas>
+        <span>Bear</span>
+      </button>
     </div>
 
     <div class="prompt-viewer-standalone" id="prompt-viewer-standalone">
@@ -1572,7 +1642,7 @@
   </div>
 </div>
 
-<script type="module" src="/dist/play-agent.js?v=13"></script>
+<script type="module" src="/dist/play-agent.js?v=14"></script>
 <script>
 (function() {
   const modal = document.getElementById('rotate-modal');

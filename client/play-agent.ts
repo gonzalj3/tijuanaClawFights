@@ -2,7 +2,7 @@
 // Downloads a quantized model via WebLLM and plays using in-browser inference.
 // No heuristic fallback — if LLM isn't ready or inference is slow, ticks are skipped.
 
-const PLAY_AGENT_VERSION = "v13";
+const PLAY_AGENT_VERSION = "v14";
 console.log(`[play-agent] version ${PLAY_AGENT_VERSION}`);
 
 import { checkWebGPUSupport, initEngine, isModelCached, pickAction, type GameState, type Action } from "./browser-llm";
@@ -568,6 +568,69 @@ function notifyIframeMyFighter(name: string) {
 const arenaIframe = document.querySelector(".arena-frame iframe") as HTMLIFrameElement | null;
 if (arenaIframe) {
   arenaIframe.addEventListener("load", () => notifyIframeMyFighter(fighterName));
+}
+
+// ─── Fighter Skin Picker ─────────────────────────────────────────
+const SKIN_URLS: Record<string, string> = {
+  blue: "/assets/fighter-blue.png",
+  red: "/assets/fighter-red.png",
+  bear: "/assets/fighter-bear.png",
+};
+let selectedSkin = localStorage.getItem("clawfights-skin") || "blue";
+
+// Draw idle frame thumbnails for each fighter card
+const fighterCards = document.querySelectorAll<HTMLButtonElement>(".fighter-card");
+fighterCards.forEach((card) => {
+  const skin = card.dataset.skin!;
+  const canvas = card.querySelector<HTMLCanvasElement>(".fighter-thumb");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d")!;
+  const img = new Image();
+  img.onload = () => {
+    // Top-left 128x128 is the first idle frame
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(img, 0, 0, 128, 128, 0, 0, 128, 128);
+  };
+  img.src = SKIN_URLS[skin]!;
+});
+
+// Restore saved selection
+fighterCards.forEach((card) => {
+  if (card.dataset.skin === selectedSkin) {
+    card.classList.add("selected");
+  } else {
+    card.classList.remove("selected");
+  }
+});
+
+// Handle card clicks
+fighterCards.forEach((card) => {
+  card.addEventListener("click", () => {
+    if (ws && ws.readyState === WebSocket.OPEN) return; // can't change mid-fight
+    selectedSkin = card.dataset.skin!;
+    localStorage.setItem("clawfights-skin", selectedSkin);
+    fighterCards.forEach((c) => c.classList.remove("selected"));
+    card.classList.add("selected");
+    // Update iframe skin
+    updateIframeSkin();
+  });
+});
+
+function updateIframeSkin() {
+  const iframe = document.querySelector(".arena-frame iframe") as HTMLIFrameElement | null;
+  if (iframe) {
+    // Update iframe src with new skin param
+    const url = new URL(iframe.src, location.href);
+    url.searchParams.set("skin", selectedSkin);
+    url.searchParams.set("embed", "true");
+    iframe.src = url.toString();
+  }
+}
+// Set initial skin on iframe
+if (arenaIframe) {
+  const url = new URL(arenaIframe.src, location.href);
+  url.searchParams.set("skin", selectedSkin);
+  arenaIframe.src = url.toString();
 }
 
 // Click name to trigger rename via naming ceremony

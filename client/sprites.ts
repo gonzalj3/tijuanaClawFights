@@ -301,6 +301,19 @@ export class ScreenShake {
 }
 
 // ─── Asset Loading ──────────────────────────────────────────────
+export const SKIN_URLS: Record<string, string> = {
+  blue: "/assets/fighter-blue.png",
+  red: "/assets/fighter-red.png",
+  bear: "/assets/fighter-bear.png",
+};
+
+/** true = spritesheet natively faces right */
+export const SKIN_FACING_RIGHT: Record<string, boolean> = {
+  blue: false,
+  red: true,
+  bear: true,
+};
+
 export interface LoadedAssets {
   fighter1: Texture | null;
   fighter2: Texture | null;
@@ -308,15 +321,18 @@ export interface LoadedAssets {
   effects: EffectSprite;
 }
 
-export async function loadAllAssets(): Promise<LoadedAssets> {
+export async function loadAllAssets(p1Skin = "blue", p2Skin = "red"): Promise<LoadedAssets> {
   const effects = new EffectSprite();
 
   let fighter1: Texture | null = null;
   let fighter2: Texture | null = null;
   let background: Texture | null = null;
 
-  try { fighter1 = await Assets.load("/assets/fighter-blue.png"); } catch {}
-  try { fighter2 = await Assets.load("/assets/fighter-red.png"); } catch {}
+  const p1Url = SKIN_URLS[p1Skin] ?? SKIN_URLS.blue!;
+  const p2Url = SKIN_URLS[p2Skin] ?? SKIN_URLS.red!;
+
+  try { fighter1 = await Assets.load(p1Url); } catch {}
+  try { fighter2 = await Assets.load(p2Url); } catch {}
   try { background = await Assets.load("/assets/arena-bg.png"); } catch {}
 
   await Promise.allSettled([

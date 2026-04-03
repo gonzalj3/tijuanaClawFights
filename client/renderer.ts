@@ -1,7 +1,7 @@
 import { Application, Graphics, Text, TextStyle, Sprite, Container } from "pixi.js";
 import { connectSpectator } from "./spectator-client.ts";
 import type { MatchStateMsg, MatchStartMsg, MatchEndMsg, ArenaStatusMsg, AgentRelayMsg, LeaderboardMsg, FighterSpeechMsg, FighterState } from "./spectator-client.ts";
-import { FighterSprite, ScreenShake, loadAllAssets, actionToAnim } from "./sprites.ts";
+import { FighterSprite, ScreenShake, loadAllAssets, actionToAnim, SKIN_FACING_RIGHT } from "./sprites.ts";
 import type { LoadedAssets } from "./sprites.ts";
 
 const CANVAS_W = 800;
@@ -43,19 +43,27 @@ let announcementText: Text;
 let announcementTimer = 0;
 let waitingFighterName: string | null = null;
 let myFighterName: string | null = null; // set by play page via postMessage
+let p1Skin = "blue"; // set by play page via postMessage before init
 
 // Listen for parent window telling us which fighter is the user's
 window.addEventListener("message", (ev) => {
   if (ev.data?.type === "setMyFighter" && typeof ev.data.name === "string") {
     myFighterName = ev.data.name;
   }
+  if (ev.data?.type === "setSkin" && typeof ev.data.skin === "string") {
+    p1Skin = ev.data.skin;
+  }
 });
 
 async function main() {
   statusEl = document.getElementById("status")!;
 
+  // Read skin from URL params (set by play page via iframe src)
+  const params = new URLSearchParams(location.search);
+  if (params.get("skin")) p1Skin = params.get("skin")!;
+
   // Load sprite assets (gracefully handles missing files)
-  const assets = await loadAllAssets();
+  const assets = await loadAllAssets(p1Skin);
   const hasSprites = !!(assets.fighter1 && assets.fighter2);
   if (hasSprites) {
     console.log("[renderer] Sprite sheets loaded!");
@@ -91,9 +99,12 @@ async function main() {
     gameLayer.addChild(floor);
   }
 
-  // Fighter sprites
-  const fighter1 = new FighterSprite(COLORS.p1, FIGHTER_W, FIGHTER_H, false);  // natively faces left
-  const fighter2 = new FighterSprite(COLORS.p2, FIGHTER_W, FIGHTER_H, true);   // natively faces right
+  // Fighter sprites — native facing depends on the skin
+  const p1FacingRight = SKIN_FACING_RIGHT[p1Skin] ?? false;
+  const p2Skin = params.get("p2skin") || "red";
+  const p2FacingRight = SKIN_FACING_RIGHT[p2Skin] ?? true;
+  const fighter1 = new FighterSprite(COLORS.p1, FIGHTER_W, FIGHTER_H, p1FacingRight);
+  const fighter2 = new FighterSprite(COLORS.p2, FIGHTER_W, FIGHTER_H, p2FacingRight);
   if (assets.fighter1) fighter1.loadFromTexture(assets.fighter1);
   if (assets.fighter2) fighter2.loadFromTexture(assets.fighter2);
   gameLayer.addChild(fighter1.container);
